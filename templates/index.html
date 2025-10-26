@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>机器人控制面板</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .control-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+            gap: 15px;
+            margin: 30px 0;
+            max-width: 300px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .control-btn {
+            background: linear-gradient(145deg, #f0f0f0, #cacaca);
+            border: none;
+            border-radius: 15px;
+            padding: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 5px 5px 10px #bebebe, -5px -5px 10px #ffffff;
+            user-select: none;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 8px 8px 15px #bebebe, -8px -8px 15px #ffffff;
+        }
+
+        .control-btn:active {
+            transform: translateY(0);
+            box-shadow: 2px 2px 5px #bebebe, -2px -2px 5px #ffffff;
+        }
+
+        .control-btn.forward {
+            grid-column: 2;
+            grid-row: 1;
+            background: linear-gradient(145deg, #4CAF50, #45a049);
+            color: white;
+        }
+
+        .control-btn.backward {
+            grid-column: 2;
+            grid-row: 3;
+            background: linear-gradient(145deg, #f44336, #da190b);
+            color: white;
+        }
+
+        .control-btn.left {
+            grid-column: 1;
+            grid-row: 2;
+            background: linear-gradient(145deg, #2196F3, #1976D2);
+            color: white;
+        }
+
+        .control-btn.right {
+            grid-column: 3;
+            grid-row: 2;
+            background: linear-gradient(145deg, #FF9800, #F57C00);
+            color: white;
+        }
+
+        .control-btn.stop {
+            grid-column: 1 / 4;
+            grid-row: 4;
+            background: linear-gradient(145deg, #9E9E9E, #757575);
+            color: white;
+            margin-top: 20px;
+        }
+
+        .speed-control {
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 15px;
+        }
+
+        .speed-control h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .speed-input {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .speed-input label {
+            font-weight: bold;
+            color: #555;
+        }
+
+        .speed-input input {
+            width: 100px;
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 1em;
+        }
+
+        .status-panel {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 10px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-weight: bold;
+        }
+
+        .status-value {
+            color: #2196F3;
+        }
+
+        .message {
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .head-control, .system-control {
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 15px;
+        }
+
+        .head-control h3, .system-control h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .head-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+            gap: 10px;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+
+        .head-btn {
+            background: linear-gradient(145deg, #9C27B0, #7B1FA2);
+            color: white;
+            font-size: 0.9em;
+            padding: 15px;
+        }
+
+        .system-btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1em;
+        }
+
+        .keyboard-hint {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(33, 150, 243, 0.1);
+            border-radius: 10px;
+            color: #1976D2;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+            
+            .control-btn {
+                padding: 15px;
+                font-size: 1em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>机器人控制面板</h1>
+        
+        <div class="message" id="message"></div>
+        
+        <div class="control-panel">
+            <button class="control-btn forward" onclick="controlRobot('forward')">
+                ⬆️ 前进
+            </button>
+            <button class="control-btn left" onclick="controlRobot('left')">
+                ⬅️ 左转
+            </button>
+            <button class="control-btn stop" onclick="controlRobot('stop')">
+                ⏹️ 停止
+            </button>
+            <button class="control-btn right" onclick="controlRobot('right')">
+                ➡️ 右转
+            </button>
+            <button class="control-btn backward" onclick="controlRobot('backward')">
+                ⬇️ 后退
+            </button>
+        </div>
+
+        <div class="speed-control">
+            <h3>⚙️ 速度设置</h3>
+            <div class="speed-input">
+                <label>线速度 (m/s):</label>
+                <input type="number" id="linearSpeed" value="0.3" step="0.1" min="0" max="2">
+            </div>
+            <div class="speed-input">
+                <label>角速度 (rad/s):</label>
+                <input type="number" id="angularSpeed" value="0.5" step="0.1" min="0" max="2">
+            </div>
+            <button class="control-btn" onclick="setSpeed()" style="margin-top: 10px; grid-column: 1; grid-row: 1;">
+                🔧 设置速度
+            </button>
+        </div>
+
+        <div class="head-control">
+            <h3>🤖 头部控制</h3>
+            <div class="head-buttons">
+                <button class="control-btn head-btn" onclick="controlHead('up')" style="grid-column: 2; grid-row: 1;">
+                    ⬆️ 抬头
+                </button>
+                <button class="control-btn head-btn" onclick="controlHead('left')" style="grid-column: 1; grid-row: 2;">
+                    ⬅️ 左转
+                </button>
+                <button class="control-btn head-btn" onclick="controlHead('center')" style="grid-column: 2; grid-row: 2;">
+                    🎯 居中
+                </button>
+                <button class="control-btn head-btn" onclick="controlHead('right')" style="grid-column: 3; grid-row: 2;">
+                    ➡️ 右转
+                </button>
+                <button class="control-btn head-btn" onclick="controlHead('down')" style="grid-column: 2; grid-row: 3;">
+                    ⬇️ 低头
+                </button>
+            </div>
+        </div>
+
+        <div class="system-control">
+            <h3>🔧 系统控制</h3>
+            <button class="control-btn system-btn" onclick="startRosLaunch()" style="background: linear-gradient(145deg, #4CAF50, #45a049); color: white;">
+                🚀 启动ROS Launch
+            </button>
+            <button class="control-btn system-btn" onclick="stopRosLaunch()" style="background: linear-gradient(145deg, #f44336, #da190b); color: white; margin-top: 10px;">
+                🛑 停止ROS Launch
+            </button>
+            <button class="control-btn system-btn" onclick="startTrackingMode()" style="background: linear-gradient(145deg, #4CAF50, #45a049); color: white; margin-top: 10px;">
+                🚀 启动跟随模式
+            </button>
+            <button class="control-btn system-btn" onclick="stopTrackingMode()" style="background: linear-gradient(145deg, #f44336, #da190b); color: white; margin-top: 10px;">
+                🛑 停止跟随模式
+            </button>
+            <button class="control-btn system-btn" onclick="restartAgent()" style="background: linear-gradient(145deg, #FF5722, #D84315); color: white; margin-top: 10px;">
+                🔄 重启Agent模块
+            </button>
+            <button class="control-btn system-btn" onclick="startNavigation()" style="background: linear-gradient(145deg, #4CAF50, #45a049); color: white; margin-top: 10px;">
+                🗺️ 启动导航系统
+            </button>
+            <button class="control-btn system-btn" onclick="stopNavigation()" style="background: linear-gradient(145deg, #f44336, #da190b); color: white; margin-top: 10px;">
+                🛑 停止导航系统
+            </button>
+            <button class="control-btn system-btn" onclick="window.location.href='/wifi_config'" style="background: linear-gradient(145deg, #2196F3, #1976D2); color: white; margin-top: 10px;">
+                📶 WiFi网络配置
+            </button>
+            <button class="control-btn system-btn" onclick="window.location.href='/settings'" style="background: linear-gradient(145deg, #9C27B0, #7B1FA2); color: white; margin-top: 10px;">
+                ⚙️ AI 设置
+            </button>
+        </div>
+
+        <div class="status-panel">
+            <h3>📊 状态信息</h3>
+            <div class="status-item">
+                <span>运行状态:</span>
+                <span class="status-value" id="isMoving">停止</span>
+            </div>
+            <div class="status-item">
+                <span>当前线速度:</span>
+                <span class="status-value" id="currentSpeed">0.0 m/s</span>
+            </div>
+            <div class="status-item">
+                <span>当前角速度:</span>
+                <span class="status-value" id="currentAngular">0.0 rad/s</span>
+            </div>
+            <div class="status-item">
+                <span>头部位置:</span>
+                <span class="status-value" id="headPosition">居中</span>
+            </div>
+        </div>
+
+        <div class="keyboard-hint">
+            <strong>💡 键盘快捷键:</strong><br>
+            W - 前进 | S - 后退 | A - 左转 | D - 右转 | 空格 - 停止
+        </div>
+    </div>
+
+    <script>
+        let statusInterval;
+
+        // 显示消息
+        function showMessage(message, type = 'success') {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = message;
+            messageEl.className = `message ${type}`;
+            messageEl.style.display = 'block';
+            
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 3000);
+        }
+
+        // 控制机器人
+        async function controlRobot(action) {
+            try {
+                const response = await fetch('/api/control', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ action: action })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (error) {
+                showMessage('网络错误: ' + error.message, 'error');
+            }
+        }
+
+        // 设置速度
+        async function setSpeed() {
+            const linearSpeed = document.getElementById('linearSpeed').value;
+            const angularSpeed = document.getElementById('angularSpeed').value;
+
+            try {
+                const response = await fetch('/api/speed', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        linear_speed: parseFloat(linearSpeed),
+                        angular_speed: parseFloat(angularSpeed)
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('速度设置成功', 'success');
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (error) {
+                showMessage('设置速度失败: ' + error.message, 'error');
+            }
+        }
+
+        // 控制头部动作
+        async function controlHead(direction) {
+            try {
+                const response = await fetch('/api/head', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ direction: direction })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (error) {
+                showMessage('控制头部失败: ' + error.message, 'error');
+            }
+        }
+
+
+        // 启动跟随模式
+        async function startTrackingMode() {
+            try {
+                const response = await fetch('/api/start_tracking_mode', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (error) {
+                showMessage('启动跟随模式失败: ' + error.message, 'error');
+            }
+        }
+
+        // 停止跟随模式
+        async function stopTrackingMode() {
+            try {
+                const response = await fetch('/api/stop_tracking_mode', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (error) {
+                showMessage('停止跟随模式失败: ' + error.message, 'error');
+            }
+        }
+
+        // 重启Agent模块
+        async function restartAgent() {
+            if (!confirm('确定要重启Agent模块吗？这可能需要几秒钟时间。')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/restart_agent', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (error) {
+                showMessage('重启Agent失败: ' + error.message, 'error');
+            }
+        }
+
+        // 启动ROS Launch
+        async function startRosLaunch() {
+            if (!confirm('确定要启动ROS Launch吗？这将启动所有机器人节点。')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/start_ros_launch', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (error) {
+                showMessage('启动ROS Launch失败: ' + error.message, 'error');
+            }
+        }
+
+        // 停止ROS Launch
+        async function stopRosLaunch() {
+            if (!confirm('确定要停止ROS Launch吗？这将停止所有机器人节点。')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/stop_ros_launch', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (error) {
+                showMessage('停止ROS Launch失败: ' + error.message, 'error');
+            }
+        }
+
+        // 启动导航系统
+        async function startNavigation() {
+            if (!confirm('确定要启动导航系统吗？这将启动map_server、amcl和move_base节点。')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/start_navigation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (error) {
+                showMessage('启动导航系统失败: ' + error.message, 'error');
+            }
+        }
+
+        // 停止导航系统
+        async function stopNavigation() {
+            if (!confirm('确定要停止导航系统吗？这将停止所有导航相关节点。')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/stop_navigation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (error) {
+                showMessage('停止导航系统失败: ' + error.message, 'error');
+            }
+        }
+
+
+        // 获取状态
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const data = result.data;
+                    document.getElementById('isMoving').textContent = data.is_moving ? '运行中' : '停止';
+                    document.getElementById('currentSpeed').textContent = data.current_speed.toFixed(2) + ' m/s';
+                    document.getElementById('currentAngular').textContent = data.current_angular.toFixed(2) + ' rad/s';
+                    
+                    // 更新头部位置显示
+                    const headPositionMap = {
+                        'center': '居中',
+                        'left': '左转',
+                        'right': '右转',
+                        'up': '抬头',
+                        'down': '低头'
+                    };
+                    document.getElementById('headPosition').textContent = headPositionMap[data.head_position] || '未知';
+                }
+            } catch (error) {
+                console.error('获取状态失败:', error);
+            }
+        }
+
+        // 键盘控制
+        document.addEventListener('keydown', (event) => {
+            switch(event.key.toLowerCase()) {
+                case 'w':
+                    controlRobot('forward');
+                    break;
+                case 's':
+                    controlRobot('backward');
+                    break;
+                case 'a':
+                    controlRobot('left');
+                    break;
+                case 'd':
+                    controlRobot('right');
+                    break;
+                case ' ':
+                    event.preventDefault();
+                    controlRobot('stop');
+                    break;
+            }
+        });
+
+        // 页面加载完成后开始更新状态
+        window.addEventListener('load', () => {
+            updateStatus();
+            statusInterval = setInterval(updateStatus, 1000); // 每秒更新一次机器人运动状态
+        });
+
+        // 页面卸载时清理定时器
+        window.addEventListener('beforeunload', () => {
+            if (statusInterval) {
+                clearInterval(statusInterval);
+            }
+        });
+    </script>
+</body>
+</html>

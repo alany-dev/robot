@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- 分布式ROS显示启动文件 -->
+  
+  <arg name="model" default="$(find test11_description)/urdf/test11.xacro"/>
+  <arg name="gui" default="true"/>
+  <arg name="rvizconfig" default="$(find test11_description)/launch/urdf.rviz"/>
+  
+  <!-- 机器人描述参数 -->
+  <param name="robot_description" command="$(find xacro)/xacro $(arg model)"/>
+  
+  <!-- 启动robot_state_publisher -->
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" output="screen">
+    <param name="publish_frequency" value="50.0"/>
+    <param name="use_tf_static" value="true"/>
+  </node>
+  
+  <!-- 启动joint_state_publisher（如果需要） -->
+  <node name="joint_state_publisher_gui" pkg="joint_state_publisher_gui" type="joint_state_publisher_gui" output="screen" if="$(arg gui)">
+    <param name="use_gui" value="$(arg gui)"/>
+  </node>
+  
+  <!-- 启动RViz -->
+  <node name="rviz" pkg="rviz" args="-d $(arg rvizconfig)" type="rviz" required="true" output="screen"/>
+  
+  <!-- 话题状态监控 -->
+  <node pkg="rqt_topic" type="rqt_topic" name="topic_monitor" output="screen"/>
+  
+</launch>
+

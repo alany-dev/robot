@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小沫 AI - 设置</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .nav-btn {
+            flex: 1;
+            padding: 12px 20px;
+            background: linear-gradient(145deg, #f0f0f0, #cacaca);
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 5px 5px 10px #bebebe;
+        }
+
+        .nav-btn.primary {
+            background: linear-gradient(145deg, #2196F3, #1976D2);
+            color: white;
+        }
+
+        .form-section {
+            margin: 30px 0;
+            padding: 25px;
+            background: rgba(0, 0, 0, 0.03);
+            border-radius: 15px;
+        }
+
+        .form-section h3 {
+            margin-bottom: 20px;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin: 20px 0;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group .helper-text {
+            margin-top: 5px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .form-group .api-key-display {
+            background: #f5f5f5;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            word-break: break-all;
+            margin-top: 8px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(145deg, #4CAF50, #45a049);
+            color: white;
+            box-shadow: 5px 5px 10px #bebebe;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 8px 8px 15px #bebebe;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(145deg, #f0f0f0, #cacaca);
+            color: #333;
+            box-shadow: 5px 5px 10px #bebebe;
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 8px 8px 15px #bebebe;
+        }
+
+        .message {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: bold;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #f5c6cb;
+        }
+
+        .message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 2px solid #bee5eb;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+
+        .status-badge.configured {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.not-configured {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚙️ 设置</h1>
+        <p class="subtitle">配置小沫 AI 助手</p>
+
+        <div class="nav-buttons">
+            <a href="/" class="nav-btn">返回控制面板</a>
+            <button class="nav-btn primary" onclick="loadConfig()">刷新配置</button>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <div class="form-section">
+            <h3>API 配置
+                <span id="apiStatus" class="status-badge not-configured">未配置</span>
+            </h3>
+            
+            <div class="form-group">
+                <label for="apiKey">阿里云 API Key *</label>
+                <input type="text" id="apiKey" placeholder="sk-xxxxxxxxxxxxxxxx" autocomplete="off">
+                <div class="helper-text">
+                    在 <a href="https://dashscope.console.aliyun.com/apiKey" target="_blank">阿里云控制台</a> 获取您的 API Key
+                </div>
+                <div id="apiKeyDisplay" class="api-key-display" style="display:none;"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="model">LLM 模型</label>
+                <select id="model">
+                    <option value="qwen-plus">Qwen Plus (推荐)</option>
+                    <option value="qwen-turbo">Qwen Turbo (更快)</option>
+                    <option value="qwen-max">Qwen Max (更强)</option>
+                    <option value="qwen-long">Qwen Long (长文本)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>TTS 语音合成配置</h3>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="enableTts" checked>
+                <label for="enableTts">启用 TTS 语音合成</label>
+            </div>
+
+            <div class="form-group">
+                <label for="ttsModel">TTS 模型</label>
+                <select id="ttsModel">
+                    <option value="cosyvoice-v2">CosyVoice V2 (推荐)</option>
+                    <option value="cosyvoice-v1">CosyVoice V1</option>
+                    <option value="sambert-zhichu-v1">Sambert 知楚</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="ttsVoice">TTS 音色</label>
+                <select id="ttsVoice">
+                    <option value="longfeifei_v2">龙飞飞 甜美娇气女 (女声，推荐)</option>
+                    <option value="longdaiyu">龙黛玉 娇率才女音 (女生)</option>
+                    <option value="longhan_v2">龙寒 温暖痴情男 (男声)</option>
+                    <option value="longlaotie_v2">龙老铁 东北直率男 (男声)</option>
+                    <option value="longjiayi_v2">龙嘉怡 知性粤语女 (女声)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-secondary" onclick="resetForm()">重置</button>
+            <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
+        </div>
+
+        <div class="form-section">
+            <h3>使用说明</h3>
+            <ul style="list-style-position: inside; color: #666; line-height: 1.8;">
+                <li>API Key 是必填项，用于访问阿里云的 AI 服务</li>
+                <li>保存配置后需要重启 Agent 服务才能生效</li>
+                <li>可以在控制面板中点击"重启 Agent"按钮重启服务</li>
+                <li>配置保存在本地，不会上传到云端</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载时获取当前配置
+        window.addEventListener('DOMContentLoaded', () => {
+            loadConfig();
+        });
+
+        // 加载配置
+        function loadConfig() {
+            fetch('/api/get_config')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const config = data.config;
+                        
+                        // 更新状态徽章
+                        const statusBadge = document.getElementById('apiStatus');
+                        if (config.api_key_configured) {
+                            statusBadge.textContent = '已配置';
+                            statusBadge.className = 'status-badge configured';
+                            
+                            // 显示遮蔽后的 API key
+                            document.getElementById('apiKeyDisplay').style.display = 'block';
+                            document.getElementById('apiKeyDisplay').textContent = '当前: ' + config.api_key_masked;
+                        } else {
+                            statusBadge.textContent = '未配置';
+                            statusBadge.className = 'status-badge not-configured';
+                            document.getElementById('apiKeyDisplay').style.display = 'none';
+                        }
+                        
+                        // 填充表单（API key 不自动填充，需要用户手动输入）
+                        document.getElementById('model').value = config.model || 'qwen-plus';
+                        document.getElementById('ttsModel').value = config.tts_model || 'cosyvoice-v2';
+                        document.getElementById('ttsVoice').value = config.tts_voice || 'longfeifei_v2';
+                        document.getElementById('enableTts').checked = config.enable_tts !== false;
+                    } else {
+                        showMessage('获取配置失败: ' + data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showMessage('获取配置失败: ' + error, 'error');
+                });
+        }
+
+        // 保存配置
+        function saveConfig() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const model = document.getElementById('model').value;
+            const ttsModel = document.getElementById('ttsModel').value;
+            const ttsVoice = document.getElementById('ttsVoice').value;
+            const enableTts = document.getElementById('enableTts').checked;
+
+            // 如果 API key 输入框为空，检查是否已有配置
+            if (!apiKey) {
+                // 检查是否已配置
+                const statusBadge = document.getElementById('apiStatus');
+                if (!statusBadge.classList.contains('configured')) {
+                    showMessage('请输入 API Key', 'error');
+                    return;
+                }
+                // 如果已配置，询问是否只更新其他配置
+                if (!confirm('API Key 未填写，是否只更新其他配置项？')) {
+                    return;
+                }
+            }
+
+            const configData = {
+                model: model,
+                tts_model: ttsModel,
+                tts_voice: ttsVoice,
+                enable_tts: enableTts
+            };
+
+            // 只有在输入了新的 API key 时才更新
+            if (apiKey) {
+                if (!apiKey.startsWith('sk-')) {
+                    showMessage('API Key 格式错误，应以 sk- 开头', 'error');
+                    return;
+                }
+                configData.api_key = apiKey;
+            }
+
+            fetch('/api/save_config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(configData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    // 清空 API key 输入框
+                    document.getElementById('apiKey').value = '';
+                    // 重新加载配置
+                    setTimeout(() => {
+                        loadConfig();
+                    }, 1000);
+                } else {
+                    showMessage('保存失败: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage('保存失败: ' + error, 'error');
+            });
+        }
+
+        // 重置表单
+        function resetForm() {
+            if (confirm('确定要重置表单吗？')) {
+                document.getElementById('apiKey').value = '';
+                loadConfig();
+                showMessage('表单已重置', 'info');
+            }
+        }
+
+        // 显示消息
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = 'message ' + type;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // 回车键保存
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+                saveConfig();
+            }
+        });
+    </script>
+</body>
+</html>
+

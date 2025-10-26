@@ -1,0 +1,29 @@
+#!/bin/sh -e
+
+create_ap --fix-unmanaged #关闭热点
+
+sleep 2
+#扬声器-避免音频数据丢失
+pactl set-default-sink "alsa_output.platform-rk809-sound.stereo-fallback"
+
+sleep 2
+
+ffplay -nodisp -autoexit  /home/orangepi/robot/src/config/sound/first.mp3 &
+
+sudo chmod 777 /dev/spidev3.0
+sudo chmod 777 /sys/class/gpio/export
+echo 128 > /sys/class/gpio/export
+echo 130 > /sys/class/gpio/export
+sudo chmod 777 /sys/class/gpio/gpio128/value
+sudo chmod 777 /sys/class/gpio/gpio128/direction
+sudo chmod 777 /sys/class/gpio/gpio130/value
+sudo chmod 777 /sys/class/gpio/gpio130/direction
+gpio mode 20 out && gpio write 20 0
+
+# 执行PWM权限修复
+echo "执行PWM权限修复..."
+
+su - orangepi -c "mkdir -p /home/orangepi/.ros"
+su - orangepi -c "cd /home/orangepi/robot/src/config && bash start.sh > /home/orangepi/.ros/start.log &"
+
+exit 0

@@ -1,0 +1,14 @@
+{
+  "api_key": "",
+  "model": "qwen-plus",
+  "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "tts_model": "cosyvoice-v2",
+  "tts_voice": "longfeifei_v2",
+  "enable_tts": true,
+  "wake_words": [
+    "小沫小沫",
+    "小莫小莫",
+    "小墨小墨"
+  ]
+}
+

@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- <include file="$(find base_control)/launch/base_control.launch"/> -->
+    <include file="$(find pkg_launch)/launch/urdf.launch"/>
+
+    <include file="$(find usb_camera)/launch/usb_camera.launch"/>
+    <include file="$(find img_decode)/launch/img_decode.launch"/>
+    <include file="$(find rknn_yolov6)/launch/rknn_yolov6.launch"/>
+    <include file="$(find img_encode)/launch/img_encode.launch"/>
+
+    <include file="$(find ydlidar)/launch/ydlidar.launch"/>
+    <include file="$(find object_track)/launch/object_track.launch"/>
+    
+    
+</launch>
