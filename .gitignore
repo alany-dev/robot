@@ -29,7 +29,7 @@ src/agent/memory.json
 # ROS
 build/
 devel/
-#install/
+install/
 *.bag
 *.pyc
 

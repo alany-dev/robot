@@ -16,7 +16,6 @@
 #include <ros/ros.h>
 #include <ros/spinner.h>
 //#include <sensor_msgs/BatteryState.h>
-#include "BatteryState.h"
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/MagneticField.h>
 #include <sensor_msgs/JointState.h>
