@@ -20,6 +20,8 @@ else
     done
 fi
 
+pactl set-default-sink "alsa_output.platform-rk809-sound.stereo-fallback"
+
 # 如果IP地址为空，则开启AP模式
 if [ -z "$host_ip" ]; then
     echo "开启AP模式..."

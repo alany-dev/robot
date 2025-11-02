@@ -1,8 +1,6 @@
 # Python
 __pycache__/
-*.py[cod]
 *$py.class
-*.so
 .Python
 *.egg-info/
 dist/
@@ -16,14 +14,12 @@ src/agent/memory.json
 
 # 日志文件
 *.log
-*.txt
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 
 # 临时文件
 *.tmp
@@ -33,7 +29,7 @@ src/agent/memory.json
 # ROS
 build/
 devel/
-install/
+#install/
 *.bag
 *.pyc
 

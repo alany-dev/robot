@@ -2,9 +2,9 @@
 
 create_ap --fix-unmanaged #关闭热点
 
-sleep 2
+#sleep 2
 #扬声器-避免音频数据丢失
-pactl set-default-sink "alsa_output.platform-rk809-sound.stereo-fallback"
+#pactl set-default-sink "alsa_output.platform-rk809-sound.stereo-fallback"
 
 sleep 2
 
