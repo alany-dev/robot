@@ -146,7 +146,6 @@ private:
     ros::NodeHandle nh;
 
     string odom_frame_id,base_frame_id;
-    sensor_msgs::BatteryState battery_msg;
 
     ros::Subscriber command_sub;
     ros::Subscriber enable_lidar_sub,reset_sub;

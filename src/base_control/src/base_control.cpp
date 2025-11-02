@@ -104,7 +104,6 @@ BaseControl::BaseControl() : nh("~")
     reset_sub = nh.subscribe("/reset", 10, &BaseControl::reset_callback, this);
 
     odom_pub = nh.advertise<nav_msgs::Odometry>(pub_odom_topic, 10);       // odom发布
-    battery_pub = nh.advertise<sensor_msgs::BatteryState>("/battery", 10); // 电池信息发布
 
     joint_pub = nh.advertise<sensor_msgs::JointState>("/joint_states", 1); // 关节状态发布,发布轮子转角
 
