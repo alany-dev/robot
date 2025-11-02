@@ -370,11 +370,12 @@ def main():
         
         # 启动ASR服务
         try:
-            asr.start()
-            print(" 语音助手已启动，请说'小沫小沫'（或同音字）来唤醒...")
-            
             # 播放启动提示音
             play_startup_sound()
+
+            asr.start()
+            print(" 语音助手已启动，请说'小沫小沫'（或同音字）来唤醒...")
+
         except Exception as e:
             print(f" ASR服务启动失败: {e}")
             play_error_sound()
