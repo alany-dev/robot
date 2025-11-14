@@ -33,3 +33,4 @@ install/
 *.bag
 *.pyc
 
+!docker/build
