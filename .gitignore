@@ -34,3 +34,4 @@ install/
 *.pyc
 
 !docker/build
+!docker/build/install

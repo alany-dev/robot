@@ -59,10 +59,9 @@ void pwm_tim1_init_tb6612(u16 period,u16 div)
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);//TIM1_CH1 GPIOA8 //TIM1_CH4 GPIOA11
 
-	//PWM频率=72M/不分频/7200=10Khz用于电机驱动芯片
 	TIM_TimeBaseStructure.TIM_Period = (period-1);//TIM_PERIOD;//设置在下一个更新事件装入活动的自动重装载寄存器周期的值
 	TIM_TimeBaseStructure.TIM_Prescaler = (div-1); //设置用来作为TIMx时钟频率除数的预分频值
-	TIM_TimeBaseStructure.TIM_ClockDivision = 0; //设置时钟分割:TDTS = Tck_tim
+	TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
 	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;  //TIM向上计数模式
 	TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure); //根据TIM_TimeBaseInitStruct中指定的参数初始化TIMx的时间基数单位
 	
@@ -113,10 +112,9 @@ void pwm_tim4_init(u16 period,u16 div)
   GPIO_Init(GPIOB, &GPIO_InitStructure);//根据设定参数初始化GPIOB
 	
 
-	//PWM频率=72M/不分频/7200=10Khz用于电机驱动芯片
 	TIM_TimeBaseStructure.TIM_Period = (period-1);//TIM_PERIOD;//设置在下一个更新事件装入活动的自动重装载寄存器周期的值
 	TIM_TimeBaseStructure.TIM_Prescaler = (div-1); //设置用来作为TIMx时钟频率除数的预分频值
-	TIM_TimeBaseStructure.TIM_ClockDivision = 0; //设置时钟分割:TDTS = Tck_tim
+	TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
 	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;  //TIM向上计数模式
 	TIM_TimeBaseInit(TIM4, &TIM_TimeBaseStructure); //根据TIM_TimeBaseInitStruct中指定的参数初始化TIMx的时间基数单位
 	

@@ -3,6 +3,8 @@
 #include <std_msgs/Bool.h>
 #include <cv_bridge/cv_bridge.h>
 #include <iostream>
+#include <shm_transport/shm_topic.hpp>
+
 
 #include <sys/time.h>
 #include "v4l2.h"
@@ -41,7 +43,7 @@ int main(int argc, char** argv)
 
     unsigned char *data_ptr;
     FrameBuf frame_buf;
-    
+
     ros::init(argc, argv, "usb_camera");
     ros::NodeHandle nh("~");
 
@@ -57,15 +59,18 @@ int main(int argc, char** argv)
     nh.param<int>("width", width, 1280);
 
     nh.param<int>("height", height, 720);
-    
+
     nh.param<int>("div", div, 1);
 
     //cv::Mat img(height, width, CV_8UC3);
 
     ros::Subscriber enable_camera_sub = nh.subscribe("/enable_camera", 10, enable_camera_callback);
 
-    ros::Publisher pub = nh.advertise<sensor_msgs::CompressedImage>(pub_image_topic, 1);
-    
+    // Use shared memory transport for better performance
+    shm_transport::Topic shm_topic(nh);
+    // Allocate 10MB shared memory for compressed images (should be enough for 1280x720 JPEG)
+    shm_transport::Publisher shm_pub = shm_topic.advertise<sensor_msgs::CompressedImage>(pub_image_topic, 1, 10 * 1024 * 1024);
+
     sensor_msgs::CompressedImage msg;
 
     ros::Rate loop_rate(30);//30Hz
@@ -74,14 +79,14 @@ int main(int argc, char** argv)
     std::string dev_names[4]={dev_name,"/dev/video0","/dev/video1","/dev/video2"};
 
 
-    if(pub.getNumSubscribers()==0)
+    if(shm_pub.getNumSubscribers()==0)
     {
         ROS_INFO("camera subscribers num = 0, do not capture");
     }
 
     while(nh.ok())
     {
-        if(pub.getNumSubscribers()==0 || enable_camera==0)//检查订阅者数目，如果为0，则不采集图像
+        if(shm_pub.getNumSubscribers()==0 || enable_camera==0)//检查订阅者数目，如果为0，则不采集图像
         {
             ros::spinOnce();
             usleep(100*1000);//100ms
@@ -100,7 +105,7 @@ int main(int argc, char** argv)
             video_index++;
             if(video_index>=4)
                 video_index = 0;
-            
+
             continue;
         }
 
@@ -116,7 +121,7 @@ int main(int argc, char** argv)
                 sleep(1);
                 break;
             }
-            
+
             if(enable_camera==0)//检查是否使能摄像头，如果为0则立即停止采集
             {
                 ROS_INFO("enable_camera = 0, release video");
@@ -131,21 +136,21 @@ int main(int argc, char** argv)
                t = tv.tv_sec + tv.tv_usec/1000000.0;
 
                fps = 30.0/div/(t-last_t);
-               ROS_DEBUG("mjpeg read fps %.2f subscribers num =%d",fps, pub.getNumSubscribers());
+               ROS_DEBUG("mjpeg read fps %.2f subscribers num =%d",fps, shm_pub.getNumSubscribers());
 
                last_t = t;
 
-                if(pub.getNumSubscribers()==0)//检查订阅者数目，如果为0则停止采集
+                if(shm_pub.getNumSubscribers()==0)//检查订阅者数目，如果为0则停止采集
                 {
                     ROS_INFO("camera subscribers num = 0, release video");
                     v4l2.release_video();//释放设备
                     break;
                 }
             }
-            
+
             if(frame_cnt % div != 0)
                 continue;
-            
+
             //printf("frame_buf 0x%X %d\n",frame_buf.start,frame_buf.length);
 
             //解码显示
@@ -154,14 +159,15 @@ int main(int argc, char** argv)
             //waitKey(1);
 
             msg.header.stamp = ros::Time::now();
-            msg.header.frame_id = frame_id; 
+            msg.header.frame_id = frame_id;
             msg.format = "jpeg";
             msg.data.assign(frame_buf.start, frame_buf.start+frame_buf.length);
 
-            pub.publish(msg); //发布压缩图像
+            shm_pub.publish(msg); //发布压缩图像
 
             ros::spinOnce();
             loop_rate.sleep();//如果比30fps还有空余时间会sleep
         }
     }
 }
+

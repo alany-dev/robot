@@ -11,11 +11,11 @@
 
 //宏定义
 #define M_PI 3.14159265
-#define SYSCLK_HZ 64000000
+#define SYSCLK_HZ 72000000
 #define DIV  1 //32
 #define PWM_FREQ_HZ 10000 //10KHz
-#define PERIOD (SYSCLK_HZ/DIV/PWM_FREQ_HZ) //PERIOD=64M/1/10000=6400
-#define CYCLE_TIMER_S 0.02 //0.5s=500ms=50Hz
+#define PERIOD (SYSCLK_HZ/DIV/PWM_FREQ_HZ) //PERIOD=74M/1/10000=7200
+#define CYCLE_TIMER_S 0.02 //0.02s=20ms=50Hz
 
 int new_recv_flag;
 int heart_beat_cnt;
@@ -123,7 +123,6 @@ int i;
 }
 
 	
-	//printf("en=%d %d mv=%d ch=%d %d asr=%d\n",mcu_data.encoder1,mcu_data.encoder2,mcu_data.vbat_mv,mcu_data.charging,mcu_data.full_charged,mcu_data.asr_id);
 
 
 
@@ -166,9 +165,9 @@ int main(void)
 //	PWM_Init_TIM1(0,7199);
 	pwm_ouput_tb6612(0,0);
 //	pwm_ouput_tb6612(0,1200);
-pwm_ouput_tb6612(1200,1200);
+        pwm_ouput_tb6612(1200,1200);
 	delay_nop_ms(500);
-pwm_ouput_tb6612(0,0);
+        pwm_ouput_tb6612(0,0);
 	uart3_init(115200);
 
 //	printf("pwm_ouput_tb6612\r\n");
