@@ -13,20 +13,18 @@
 class Uart
 {
 public:
-    Uart();
-    ~Uart();
+ Uart();
+ ~Uart();
 
-    int init(std::string &dev,int buad);
-    int read_data_test();
-    int send_data(unsigned char *buf, int len);
-    int read_mcu_data(std::string &recv_str);
+ int init(std::string &dev, int buad);
+ int read_data_test();
+ int send_data(unsigned char *buf, int len);
+ int read_mcu_data(std::string &recv_str);
 
-    int fd;
+ int fd;
 
 private:
     int init_fd(int fd,int nSpeed, int nBits, char nEvent, int nStop);
-
-    
 
     char buffer[BUF_SIZE];
     int recv_cnt;

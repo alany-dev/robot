@@ -19,26 +19,25 @@ using namespace cv;
 class ImgDecode
 {
 public:
-    ImgDecode();
+ ImgDecode();
 
+ ros::NodeHandle nh;
 
-    ros::NodeHandle nh;
+ ros::Subscriber compressed_image_sub;
+ ros::Publisher raw_image_pub;
+ sensor_msgs::Image msg_pub;
+ cv::Mat image;
 
-    ros::Subscriber compressed_image_sub;
-    ros::Publisher raw_image_pub;
-    sensor_msgs::Image msg_pub;
-    cv::Mat image;
+ int fps_div;
+ double scale;
+ unsigned int frame_cnt = 0;
 
-    int fps_div;
-    double scale;
-    unsigned int frame_cnt=0;
+ void compressed_image_callback(
+     const sensor_msgs::CompressedImageConstPtr& msg);
 
-    void compressed_image_callback(const sensor_msgs::CompressedImageConstPtr& msg);
+ string sub_jpeg_image_topic;
 
-    string sub_jpeg_image_topic;
-
-
-    void run_check_thread();
+ void run_check_thread();
 
 #if(USE_ARM_LIB==1)
     MppDecode mpp_decode;

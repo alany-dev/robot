@@ -222,35 +222,35 @@ void BaseControl::pub_plot(vector<float> array)
     array_msg.data = array;
     plot_pub.publish(array_msg);
 }
-
 void BaseControl::run()
 {
     int ret;
+    ros::Rate rate(50);  // 50Hz频率控制，20ms周期
 
     while (ros::ok())
     {
         ros::spinOnce(); // 处理回调函数，如果没有这个，按下ctrl c不会立即停止
 
-        if (uart.fd <= 0) // x86系统没有这个串口设备
+        if (uart.fd <= 0)  // x86系统没有这个串口设备
         {
-            usleep(20 * 1000); // 20ms
-            memset(&mcu_data, 0, sizeof(McuData));
-            recv_str.assign((char *)&mcu_data, sizeof(McuData)); // x86平台模拟假的传感器数据
-        }
-        else
-        {
-            // std::cout << "recv_str: " << recv_str << std::endl;
-            ret = uart.read_mcu_data(recv_str);
-            if (ret < 0) // 报错，则重新读取
-            {
-                continue;
-            }
+          memset(&mcu_data, 0, sizeof(McuData));
+          recv_str.assign((char *)&mcu_data,
+                          sizeof(McuData));  // x86平台模拟假的传感器数据
+        } else {
+          // std::cout << "recv_str: " << recv_str << std::endl;
+          ret = uart.read_mcu_data(recv_str);
+          if (ret < 0)  // 报错，则重新读取
+          {
+            rate.sleep();  // 控制频率，避免高频循环
+            continue;
+          }
         }
 
         // 校验数据长度
         if (recv_str.size() != sizeof(McuData))
         {
             ROS_WARN("recv_str len= %d, != %d !!! recv_str: %s", recv_str.size(), sizeof(McuData), recv_str.c_str());
+            rate.sleep();  // 控制频率
             continue;
         }
 
@@ -264,6 +264,7 @@ void BaseControl::run()
         if (previous_time == 0)              // 第一次无法计算dt,无法计算速度
         {
             previous_time = current_time;
+            rate.sleep();  // 控制频率
             continue;
         }
         dt = current_time - previous_time;
@@ -272,6 +273,7 @@ void BaseControl::run()
         if (pluses_m == 0 || wheel_distance_m == 0) // 这两个参数作为分母不能为0
         {
             ROS_WARN("pluses_m or wheel_distance_m value error!");
+            rate.sleep();  // 控制频率
             continue;
         }
 
@@ -337,6 +339,8 @@ void BaseControl::run()
 
                           all_encoder1,
                           all_encoder2);
+
+        rate.sleep();  // 控制循环频率
     }
 }
 
@@ -350,6 +354,7 @@ int main(int argc, char **argv)
     base_control.run();
 
     ROS_INFO("base_control exit");
+
     ros::shutdown();
 
     return 0;

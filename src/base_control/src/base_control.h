@@ -71,18 +71,17 @@ enum {
 
 typedef struct
 {
-unsigned char head1;//数据头1 'D'
-unsigned char head2;//数据头2 'A'
-unsigned char struct_size;//结构体长度
+  unsigned char head1;        //数据头1 'D'
+  unsigned char head2;        //数据头2 'A'
+  unsigned char struct_size;  //结构体长度
 
-short encoder1;//编码器当前值1
-short encoder2;//编码器当前值2
+  short encoder1;  //编码器当前值1
+  short encoder2;  // 编码器当前值2
 
-
-unsigned char end1;//数据尾1 'T'
-unsigned char end2;//数据尾2 'A'
-unsigned char end3;//数据尾3 '\r' 0x0d
-unsigned char end4;//数据尾4 '\n' 0x0a
+  unsigned char end1;  //数据尾1 'T'
+  unsigned char end2;  //数据尾2 'A'
+  unsigned char end3;  //数据尾3 '\r' 0x0d
+  unsigned char end4;  //数据尾4 '\n' 0x0a
 }McuData;
 
 
@@ -156,7 +155,6 @@ private:
     ros::Publisher robot_state_pub;
 
     Uart uart;
-
 
     McuData mcu_data;
     unsigned int cnt=0;

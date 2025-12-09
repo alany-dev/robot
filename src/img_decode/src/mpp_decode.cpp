@@ -297,7 +297,7 @@ int MppDecode::get_image(MppFrame &frame,cv::Mat &image)
 
 	//printf("%dx%d %dx%d %d %d\n",width,height,h_stride,v_stride,fmt,base);
 
-	return 0;
+    return 0;
 }
 
 #endif
