@@ -1,9 +1,10 @@
 #include "ros/ros.h"
 #include "sensor_msgs/LaserScan.h"
-#include <cmath>      
+#include <cmath>       // M_PI
 #include <vector>     
-#include <numeric>     
+#include <numeric>    
 #include <algorithm>   
+#include <shm_transport/shm_topic.hpp>
 
 #define RAD2DEG(x) ((x)*180./M_PI)
 
@@ -17,7 +18,7 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
     printf("[YDLIDAR INFO]: angle_range : [%f, %f]\n", RAD2DEG(scan->angle_min), RAD2DEG(scan->angle_max));
   
     ros::Time publish_time = scan->header.stamp;  
-    ros::Time receive_time = ros::Time::now();    
+    ros::Time receive_time = ros::Time::now();   
     
     if (publish_time.isZero()) {
         ROS_WARN("Invalid publish time (stamp is zero), skip delay calculation!");
@@ -29,7 +30,7 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
     
     delay_list.push_back(delay_ms);
     if (delay_list.size() > MAX_DELAY_LIST_SIZE) {
-        delay_list.erase(delay_list.begin());
+        delay_list.erase(delay_list.begin()); 
     }
     
     double avg_delay = std::accumulate(delay_list.begin(), delay_list.end(), 0.0) / delay_list.size();
@@ -52,7 +53,8 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "ydlidar_client");
     ros::NodeHandle n;
     
-    ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 1000, scanCallback);
+    shm_transport::Topic shm_topic(n);
+    shm_transport::Subscriber<sensor_msgs::LaserScan> shm_sub = shm_topic.subscribe("/scan", 1000, scanCallback);
     
     ROS_INFO("YDLIDAR client start! Waiting for /scan topic...");
     ros::spin(); 

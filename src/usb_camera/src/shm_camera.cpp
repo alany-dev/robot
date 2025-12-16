@@ -50,9 +50,9 @@ int main(int argc, char** argv)
     string pub_image_topic,dev_name,frame_id;
     int width,height,div;
 
-    nh.param<string>("pub_image_topic", pub_image_topic, "/jpeg_image");
+    nh.param<string>("pub_image_topic", pub_image_topic, "/image_raw/compressed");
 
-    nh.param<string>("dev_name", dev_name, "/dev/video1");
+    nh.param<string>("dev_name", dev_name, "/dev/video0");
 
     nh.param<string>("frame_id", frame_id, "camera");
 

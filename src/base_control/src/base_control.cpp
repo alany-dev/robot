@@ -48,19 +48,6 @@ void BaseControl::cmd_vel_callback(const geometry_msgs::Twist::ConstPtr &msg)
     target_rad_s = msg->angular.z; // 目标角速度rad/s
 }
 
-void BaseControl::enable_lidar_callback(const std_msgs::Bool::ConstPtr &msg)
-{
-    if (msg->data)
-    {
-        enable_lidar = 1;
-        ROS_INFO("enable_lidar true");
-    }
-    else
-    {
-        enable_lidar = 0;
-        ROS_INFO("enable_lidar false");
-    }
-}
 
 void BaseControl::reset_callback(const std_msgs::Bool::ConstPtr &msg)
 {
@@ -100,21 +87,11 @@ BaseControl::BaseControl() : nh("~")
 
     // 订阅主题command
     command_sub = nh.subscribe(sub_cmd_vel_topic, 10, &BaseControl::cmd_vel_callback, this);         // 速度指令订阅
-    enable_lidar_sub = nh.subscribe("/enable_lidar", 10, &BaseControl::enable_lidar_callback, this); // 打开或关闭雷达订阅
     reset_sub = nh.subscribe("/reset", 10, &BaseControl::reset_callback, this);
 
     odom_pub = nh.advertise<nav_msgs::Odometry>(pub_odom_topic, 10);       // odom发布
 
-    joint_pub = nh.advertise<sensor_msgs::JointState>("/joint_states", 1); // 关节状态发布,发布轮子转角
-
-    // imu_pub = nh.advertise<sensor_msgs::Imu>("/imu", 10); //IMU发布
-    // mag_pub = nh.advertise<sensor_msgs::MagneticField>("/mag", 10);//磁力计发布
-
     plot_pub = nh.advertise<std_msgs::Float32MultiArray>("/plot", 10); // 目标和实际速度散点图发布，用于PID调试
-    tts_pub = nh.advertise<std_msgs::String>("/tts", 10);              // 语音命令字符串发布
-
-    asr_id_pub = nh.advertise<std_msgs::Int32>("/asr_id", 10);
-    robot_state_pub = nh.advertise<std_msgs::Int16MultiArray>("/robot_state", 10);
 
     dynamic_config = boost::bind(&BaseControl::dynamic_reconfigure_callback, this, _1, _2); // 动态参数回调
     server.setCallback(dynamic_config);
@@ -130,24 +107,6 @@ BaseControl::BaseControl() : nh("~")
     ROS_INFO("device: %s buad: %d open success", dev.c_str(), buad);
 }
 
-// 发布关节信息
-void BaseControl::pub_joint_msg(double l_angle, double r_angle)
-{
-    // 创建并填充消息
-    sensor_msgs::JointState joint_state;
-    joint_state.header = odom_msg.header;
-    joint_state.name.resize(2);
-    joint_state.position.resize(2);
-
-    joint_state.name[0] = "l_wheel_joint";
-    joint_state.position[0] = l_angle;
-
-    joint_state.name[1] = "r_wheel_joint";
-    joint_state.position[1] = r_angle;
-
-    // 发布消息
-    joint_pub.publish(joint_state);
-}
 
 void BaseControl::control_robot(int target1, int target2)
 {
@@ -241,7 +200,7 @@ void BaseControl::run()
           ret = uart.read_mcu_data(recv_str);
           if (ret < 0)  // 报错，则重新读取
           {
-            rate.sleep();  // 控制频率，避免高频循环
+            rate.sleep(); 
             continue;
           }
         }
@@ -250,7 +209,7 @@ void BaseControl::run()
         if (recv_str.size() != sizeof(McuData))
         {
             ROS_WARN("recv_str len= %d, != %d !!! recv_str: %s", recv_str.size(), sizeof(McuData), recv_str.c_str());
-            rate.sleep();  // 控制频率
+            rate.sleep(); 
             continue;
         }
 
@@ -264,7 +223,7 @@ void BaseControl::run()
         if (previous_time == 0)              // 第一次无法计算dt,无法计算速度
         {
             previous_time = current_time;
-            rate.sleep();  // 控制频率
+            rate.sleep();  
             continue;
         }
         dt = current_time - previous_time;
@@ -273,7 +232,7 @@ void BaseControl::run()
         if (pluses_m == 0 || wheel_distance_m == 0) // 这两个参数作为分母不能为0
         {
             ROS_WARN("pluses_m or wheel_distance_m value error!");
-            rate.sleep();  // 控制频率
+            rate.sleep();  
             continue;
         }
 

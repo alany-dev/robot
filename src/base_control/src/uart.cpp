@@ -36,7 +36,7 @@ int Uart::init_fd(int fd,int nSpeed, int nBits, char nEvent, int nStop)
         perror("SetupSerial 1");
         return -1;
     }
-    bzero( &newtio, sizeof( newtio ) );
+    bzero(&newtio, sizeof(newtio));
     newtio.c_cflag  |=  CLOCAL | CREAD;
     newtio.c_cflag &= ~CSIZE;
 
@@ -191,8 +191,9 @@ int Uart::read_mcu_data(std::string &recv_str)
     recv_str.clear();
 
     while(recv_ok_flag==false)
-    {
-        recv_cnt = read(fd, buffer, BUF_SIZE);//阻塞
+    { 
+        //串口缓冲区读数据，（读多个数据）
+        recv_cnt = read(fd, buffer, BUF_SIZE);// 1s阻塞
         if(recv_cnt==0)//如果没有数据1秒会超时退出,此时recv_cnt=0
         {
             ROS_WARN("uart read no data!");
@@ -224,7 +225,7 @@ int Uart::read_mcu_data(std::string &recv_str)
     }
 
     //校验长度
-    if(recv_str.size()<8)//数据太短
+    if(recv_str.size()<11)//数据太短
     {
         ROS_WARN("recv_str len too short: %d, data: ",recv_str.size(),recv_str.c_str());
         return -3;

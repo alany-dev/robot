@@ -24,9 +24,9 @@ public:
  int fd;
 
 private:
-    int init_fd(int fd,int nSpeed, int nBits, char nEvent, int nStop);
+ int init_fd(int fd, int nSpeed, int nBits, char nEvent, int nStop);
 
-    char buffer[BUF_SIZE];
-    int recv_cnt;
-    char ch=0,l_ch=0,ll_ch=0,lll_ch=0;
+ char buffer[BUF_SIZE];
+ int recv_cnt;
+ char ch = 0, l_ch = 0, ll_ch = 0, lll_ch = 0;
 };

@@ -1,7 +1,7 @@
 <launch>
     <arg name="lidar_frame" default="laser_link"/> 
     
-    <node name="ydlidar_node"  pkg="ydlidar"  type="ydlidar_node" output="screen">
+    <node name="ydlidar_node"  pkg="ydlidar"  type="ydlidar_node_v2" output="screen">
 
         <!--参数说明：https://github.com/YDLIDAR/ydlidar_ros_driver-->
         <!-- /dev/ydlidar /dev/ttyTHS1 is nano 40 pin uart-->
