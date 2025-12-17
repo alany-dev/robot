@@ -1,9 +1,7 @@
-#include "img_decode.h"
-
+#include "shm_img_decode.h"
 #include <thread>
-#include <chrono>
 
-//如果没有破浪线nh.param后面的参数要加上节点名字，否则获取不到launch中的参数，所以最好加上波浪线
+
 ImgDecode::ImgDecode() : nh("~") 
 {
     string pub_raw_image_topic,camera_info_topic;
@@ -18,8 +16,10 @@ ImgDecode::ImgDecode() : nh("~")
     nh.param<int>("width", width, 1280);
     nh.param<int>("height", height, 720);
 
-    raw_image_pub = nh.advertise<sensor_msgs::Image>(pub_raw_image_topic, 10);
+    shm_transport::Topic shm_topic(nh);
+    shm_raw_image_pub = shm_topic.advertise<sensor_msgs::Image>(pub_raw_image_topic, 1, 300 * 1024 * 1024);
     
+    ROS_INFO("Using shared memory transport for image publishing");
 
 #if(USE_ARM_LIB==1)
     mpp_decode.init(width,height);
@@ -36,9 +36,6 @@ void ImgDecode::compressed_image_callback(const sensor_msgs::CompressedImageCons
     {
         return;
     }
-
-
-// auto t1 = std::chrono::system_clock::now();
 
     
 #if(USE_ARM_LIB==1)
@@ -66,9 +63,6 @@ void ImgDecode::compressed_image_callback(const sensor_msgs::CompressedImageCons
     }
 #endif
 
-// auto t2 = std::chrono::system_clock::now();
-    
-
     msg_pub.header = msg->header;//使用原有时间戳
     msg_pub.height = image.rows * scale;
     msg_pub.width =  image.cols * scale;
@@ -87,27 +81,16 @@ void ImgDecode::compressed_image_callback(const sensor_msgs::CompressedImageCons
     memcpy(msg_pub.data.data(), image.data, msg_pub.height * msg_pub.width * 3);
 #endif
     
-// auto t3 = std::chrono::system_clock::now();
-
-    raw_image_pub.publish(msg_pub);//发布图像
-
-// auto t4 = std::chrono::system_clock::now();
-
-// ROS_WARN_THROTTLE(1,"decode=%d ms resize=%d ms pub=%d ms",
-// std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count(),
-// std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count(),
-// std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3).count());
+    shm_raw_image_pub.publish(msg_pub);
         
 }
 
 void ImgDecode::run_check_thread()
 {
     int last_subscribers = 0;
-    ros::Rate check_rate(10); 
-
     while(ros::ok())
     {
-        int subscribers = raw_image_pub.getNumSubscribers();
+        int subscribers = shm_raw_image_pub.getNumSubscribers();
         if(subscribers==0 && last_subscribers>0)
         {
             ROS_INFO("decode image subscribers = 0, src sub shutdown");
@@ -121,7 +104,7 @@ void ImgDecode::run_check_thread()
 
         last_subscribers = subscribers;
 
-        check_rate.sleep(); 
+        usleep(100*1000);//100ms
     }
 }
 
@@ -129,7 +112,7 @@ void ImgDecode::run_check_thread()
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "img_decode");
+    ros::init(argc, argv, "shm_img_decode");
 
     ImgDecode img_decode;
 
@@ -137,11 +120,5 @@ int main(int argc, char** argv)
 
     ros::spin();
 
-
-    
     return 0;
 }
-
-
-
-

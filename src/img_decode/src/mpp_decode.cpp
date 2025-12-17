@@ -82,7 +82,7 @@ int MppDecode::init_mpp()
         return ret;
     }
 
-	uint32_t need_split = 0;
+	uint32_t need_split = 1;
 	//MPP_DEC_SET_PARSER_SPLIT_MODE ：  （仅限解码）
 	//自动拼包（建议开启），硬编解码器每次解码就是一个Frame，
 	//所以如果输入的数据不确定是不是一个Frame
@@ -297,7 +297,7 @@ int MppDecode::get_image(MppFrame &frame,cv::Mat &image)
 
 	//printf("%dx%d %dx%d %d %d\n",width,height,h_stride,v_stride,fmt,base);
 
-    return 0;
+	return 0;
 }
 
 #endif
