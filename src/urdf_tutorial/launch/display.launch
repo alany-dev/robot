@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<launch>
+
+  <!-- 参数：URDF文件路径 -->
+  <arg name="urdf_file" default="$(find urdf_tutorial)/urdf/myfirst.urdf"/>
+  
+  <!-- 
+    步骤1：加载URDF文件到ROS参数服务器
+    参数名必须是 "robot_description"，这是ROS的标准约定
+    textfile属性用于直接读取URDF文件内容
+  -->
+  <param name="robot_description" textfile="$(arg urdf_file)"/>
+  
+  <!-- 
+    步骤2：启动robot_state_publisher节点
+    这个节点会订阅/joint_states话题，并发布机器人各个link之间的TF变换
+    同时发布/robot_description话题供RViz等工具使用
+  -->
+  <node name="robot_state_publisher" 
+        pkg="robot_state_publisher" 
+        type="robot_state_publisher" 
+        output="screen"/>
+  
+  <!-- 
+    步骤3：启动joint_state_publisher节点
+    它负责发布关节状态到/joint_states话题
+    即使URDF中没有关节，这个节点也可以运行（会发布空状态）
+    如果机器人有可动关节，可以使用joint_state_publisher_gui提供GUI界面
+  -->
+  <node name="joint_state_publisher" 
+        pkg="joint_state_publisher" 
+        type="joint_state_publisher" 
+        output="screen"/>
+  
+</launch>

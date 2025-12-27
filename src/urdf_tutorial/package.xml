@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>urdf_tutorial</name>
+  <version>1.0.0</version>
+  <description>URDF基础教学示例包</description>
+  
+  <maintainer email="teacher@example.com">Teacher</maintainer>
+  <license>MIT</license>
+  
+  <buildtool_depend>catkin</buildtool_depend>
+  
+  <!-- 运行时依赖 -->
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher</exec_depend>
+  
+</package>
