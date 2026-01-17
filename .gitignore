@@ -35,3 +35,6 @@ install/
 
 !docker/build
 !docker/build/install
+
+offline-agent/llamacpp-ros/models/Qwen3-0.6B-BF16.gguf
+offline-agent/install
