@@ -42,11 +42,10 @@ if [ ! -z "$ASR_BIN" ]; then
         --tokens="$SCRIPT_DIR/voice/models/sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16/tokens.txt" \
         --encoder="$SCRIPT_DIR/voice/models/sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16/encoder-epoch-99-avg-1.int8.onnx" \
         --decoder="$SCRIPT_DIR/voice/models/sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16/decoder-epoch-99-avg-1.onnx" \
-        --joiner="$SCRIPT_DIR/voice/models/sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16/joiner-epoch-99-avg-1.int8.onnx" \
-        > "$LOG_DIR/asr.log" 2>&1 &
+        --joiner="$SCRIPT_DIR/voice/models/sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16/joiner-epoch-99-avg-1.int8.onnx"  &
     ASR_PID=$!
     echo -e "ASR 服务已启动"
-    sleep 2
+    sleep 8
 
 fi
 
@@ -65,11 +64,10 @@ if [ ! -z "$LLM_BIN" ]; then
     echo -e "启动 LLM: $LLM_BIN"
     echo -e "模型路径: $LLM_MODEL"
     cd "$SCRIPT_DIR"
-    "$LLM_BIN" -m "$LLM_MODEL" -t 8 \
-        > "$LOG_DIR/llm.log" 2>&1 &
+    "$LLM_BIN" -m "$LLM_MODEL" -t 8 &
     LLM_PID=$!
     echo -e "LLM 服务已启动 (PID: $LLM_PID)"
-    sleep 3
+    sleep 25
 
 fi
 
@@ -90,8 +88,7 @@ if [ ! -z "$TTS_BIN" ]; then
     echo -e "启动 TTS: $TTS_BIN"
     echo -e "模型路径: $TTS_MODEL"
     cd "$SCRIPT_DIR"
-    "$TTS_BIN" "$TTS_MODEL" \
-        > "$LOG_DIR/tts.log" 2>&1 &
+    "$TTS_BIN" "$TTS_MODEL"  &
     TTS_PID=$!
     echo -e " TTS 服务已启动"
     sleep 2

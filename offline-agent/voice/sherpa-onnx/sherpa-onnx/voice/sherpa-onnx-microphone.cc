@@ -75,6 +75,9 @@ static std::string tolowerUnicode(const std::string &input_str) {
 
 int32_t main(int32_t argc, char *argv[]) {
 
+  ros::init(argc, argv, "sherpa_onnx_microphone");
+  ros::NodeHandle nh;
+  ros::Publisher llm_pub = nh.advertise<std_msgs::String>("/llm_request", 10);
   zmq_component::ZmqClient block_client("tcp://localhost:6677");
 
   signal(SIGINT, Handler);
@@ -116,10 +119,6 @@ for a list of pre-trained models to download.
 
   sherpa_onnx::OnlineRecognizer recognizer(config);
   auto s = recognizer.CreateStream();
-
-  ros::init(argc, argv, "sherpa_onnx_microphone");
-  ros::NodeHandle nh;
-  ros::Publisher llm_pub = nh.advertise<std_msgs::String>("/llm_request", 10);
 
   sherpa_onnx::Microphone mic;
 

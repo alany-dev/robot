@@ -2,7 +2,7 @@
 #1.安装和挂载NFS
 sudo apt update
 sudo apt install -y nfs-common avahi-daemon
-
+sudo apt install -y libzmq3-dev libasound2-dev libportaudio2 libportaudiocpp0 portaudio19-dev
 #2.配置avahi-daemon服务
 #注意事项：一个局域网不能同时有多个orangepi.local设备
 sudo sed -i 's/#host-name=foo/host-name=orangepi/' /etc/avahi/avahi-daemon.conf

@@ -226,24 +226,6 @@ int main(int argc, char ** argv) {
     SetConsoleCtrlHandler(reinterpret_cast<PHANDLER_ROUTINE>(console_ctrl_handler), true);
 #endif
 
-    // 加载模型
-    console::log("Loading model...\n");
-    if (!ctx_cli.ctx_server.load_model(params)) {
-        console::error("Failed to load the model\n");
-        return 1;
-    }
-
-    std::thread inference_thread([&ctx_cli]() {
-        ctx_cli.ctx_server.start_loop();
-    });
-
-    if (!params.system_prompt.empty()) {
-        ctx_cli.messages.push_back({
-            {"role", "system"},
-            {"content", params.system_prompt}
-        });
-    }
-
     ros::Subscriber asr_sub = nh.subscribe("/llm_request", 10, asrTextCallback);
     
     ros::Publisher tts_pub = nh.advertise<std_msgs::String>("/tts/text_input", 10);
@@ -260,6 +242,25 @@ int main(int argc, char ** argv) {
     console::log("Publishing to /tts/text_input topic for TTS synthesis...\n");
     console::log("Publishing to /llm/function_call topic for function calls...\n");
     console::log("StreamTaskDispatcher initialized for JSON parsing and task dispatching...\n\n");
+
+    // 加载模型
+    console::log("Loading model...\n");
+    if (!ctx_cli.ctx_server.load_model(params)) {
+        console::error("Failed to load the model\n");
+        return 1;
+    }
+    console::log("Model loaded successfully\n");
+
+    std::thread inference_thread([&ctx_cli]() {
+        ctx_cli.ctx_server.start_loop();
+    });
+
+    if (!params.system_prompt.empty()) {
+        ctx_cli.messages.push_back({
+            {"role", "system"},
+            {"content", params.system_prompt}
+        });
+    }
 
     ros::spin();
     

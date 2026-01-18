@@ -29,6 +29,7 @@ target_link_libraries(sherpa-onnx-microphone-test1
   pthread  
   /usr/local/lib/libzmq_component.so
   zmq
+  jack  
 )
 
 
