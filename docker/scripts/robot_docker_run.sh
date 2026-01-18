@@ -15,12 +15,20 @@ uid="$(id -u)"
 group="$(id -g -n)"
 gid="$(id -g)"
 
+ros_ip=$(hostname -I | awk '{print $1}')
+if [ -z "$ros_ip" ]; then
+    ros_ip="127.0.0.1"
+fi
+ros_master_uri="http://192.168.31.179:11311"
 
 echo "stop and rm docker" 
 docker stop robot > /dev/null
 docker rm -v -f robot > /dev/null
 
 echo "start docker"
+echo "ROS_MASTER_URI=${ros_master_uri}"
+echo "ROS_IP=${ros_ip}"
+
 docker run -it -d \
 --privileged=true \
 --name robot \
@@ -31,6 +39,8 @@ docker run -it -d \
 -e DOCKER_GRP="${group}" \
 -e DOCKER_GRP_ID="${gid}" \
 -e XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
+-e ROS_MASTER_URI="${ros_master_uri}" \
+-e ROS_IP="${ros_ip}" \
 -v ${MONITOR_HOME_DIR}:/robot \
 -v ${XDG_RUNTIME_DIR}:${XDG_RUNTIME_DIR} \
 --network host \

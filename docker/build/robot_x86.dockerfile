@@ -16,8 +16,7 @@ RUN apt update && \
     curl \
     cmake \
     net-tools \
-    python3 python3-pip 
-
+    python3 python3-pip   
 # 添加ROS源
 RUN sh -c 'echo "deb http://mirrors.ustc.edu.cn/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list' #中科大源
 RUN apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
@@ -52,7 +51,9 @@ RUN echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc
 COPY install/ydlidar-sdk /tmp/install/ydlidar-sdk
 RUN /tmp/install/ydlidar-sdk/install_ydlidar_sdk.sh
 
+RUN apt install -y libportaudio2 libportaudiocpp0 portaudio19-dev
 
+COPY install/offline_agent /tmp/
 
 RUN echo "source /robot/devel/setup.bash" >> ~/.bashrc
 
