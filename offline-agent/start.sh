@@ -9,18 +9,19 @@ echo -e "当前目录: $SCRIPT_DIR"
 export LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH}
 
 cleanup() {
-    echo -e "正在停止所有服务..."
+    echo -e "\n正在停止所有服务..."
     
     pkill -f "sherpa-onnx-microphone" 2>/dev/null && echo -e "ASR 服务已停止" || true
     
-    pkill -f "llamacpp-ros" 2>/dev/null && echo -e "LLM 服务已停止" || true
+    pkill -f "llamacpp" 2>/dev/null && echo -e "LLM 服务已停止" || true
     
     pkill -f "tts_server" 2>/dev/null && echo -e "TTS 服务已停止" || true
     
+    exit 0
 }
 
-# 先停止所有服务
-cleanup
+trap cleanup SIGINT SIGTERM
+
 
 # 1. 启动ASR服务 
 echo -e "========== 启动 ASR 服务 =========="
@@ -67,7 +68,7 @@ if [ ! -z "$LLM_BIN" ]; then
     "$LLM_BIN" -m "$LLM_MODEL" -t 8 &
     LLM_PID=$!
     echo -e "LLM 服务已启动 (PID: $LLM_PID)"
-    sleep 25
+    sleep 20
 
 fi
 
@@ -95,5 +96,5 @@ if [ ! -z "$TTS_BIN" ]; then
     
 fi
 
-
+echo -e "\n所有服务已启动，按 Ctrl+C 停止所有服务"
 wait

@@ -4,57 +4,47 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+#include <locale>
+#include <codecvt>
 
 using json = nlohmann::ordered_json;
-
-namespace {
-    // 跳过空白字符
-    void skipWhitespace(const std::string& str, size_t& pos) {
-        while (pos < str.length() && (str[pos] == ' ' || str[pos] == '\t' || str[pos] == '\n' || str[pos] == '\r')) {
-            pos++;
-        }
-    }
-
-    // 读取字符串值（处理转义字符）
-    std::string readStringValue(const std::string& str, size_t& pos) {
-        skipWhitespace(str, pos);
-        if (pos >= str.length() || str[pos] != '"') {
-            return "";
-        }
-        pos++; // 跳过开始的引号
-        
-        std::string result;
-        bool escaped = false;
-        while (pos < str.length()) {
-            char c = str[pos++];
-            if (escaped) {
-                if (c == 'n') result += '\n';
-                else if (c == 't') result += '\t';
-                else if (c == 'r') result += '\r';
-                else if (c == '\\') result += '\\';
-                else if (c == '"') result += '"';
-                else result += c;
-                escaped = false;
-            } else if (c == '\\') {
-                escaped = true;
-            } else if (c == '"') {
-                break; // 字符串结束
-            } else {
-                result += c;
-            }
-        }
-        return result;
-    }
-}
+  
 
 StreamTaskDispatcher::StreamTaskDispatcher(ros::Publisher* tts_pub, FunctionCallCallback fc_callback)
     : tts_publisher_(tts_pub)
     , fc_callback_(fc_callback)
     , accumulated_content_("")
-    , res_content_("")
     , parse_buffer_("")
-    , tts_buffer_("")
+    , tts_buffer_(L"")
 {
+}
+
+std::wstring StreamTaskDispatcher::utf8ToWstring(const std::string& utf8_str) {
+    if (utf8_str.empty()) {
+        return std::wstring();
+    }
+    
+    try {
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+        return converter.from_bytes(utf8_str);
+    } catch (const std::range_error& e) {
+        std::cerr << "[StreamTaskDispatcher] UTF-8 to wstring conversion failed: " << e.what() << std::endl;
+        return std::wstring();
+    }
+}
+
+std::string StreamTaskDispatcher::wstringToUtf8(const std::wstring& wstr) {
+    if (wstr.empty()) {
+        return std::string();
+    }
+    
+    try {
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+        return converter.to_bytes(wstr);
+    } catch (const std::range_error& e) {
+        std::cerr << "[StreamTaskDispatcher] wstring to UTF-8 conversion failed: " << e.what() << std::endl;
+        return std::string();
+    }
 }
 
 void StreamTaskDispatcher::processDelta(const std::string& delta) {
@@ -63,38 +53,21 @@ void StreamTaskDispatcher::processDelta(const std::string& delta) {
         return;
     }
 
-
-    // 累积内容
     accumulated_content_ += delta;
 
-    // 流式提取 "res" 字段
     std::string res_delta = extractResDelta(delta);
     
     if (!res_delta.empty()) {
-        // 注意：extractResDelta 已经更新了 res_content_，这里不需要再次累加
-        std::cout << "[StreamTaskDispatcher] processDelta: 当前 res 字段总内容: \"" << res_content_ << "\"" << std::endl;
+        std::cout << "[StreamTaskDispatcher] processDelta: 当前 LLM 字段总内容: \"" << accumulated_content_ << "\"" << std::endl;
         
-        // 处理缓存文本
         processBufferedText(res_delta);
-    } else {
     }
     
     std::cout << "[StreamTaskDispatcher] processDelta: ---" << std::endl;
 }
 
 void StreamTaskDispatcher::processComplete(const std::string& full_content) {
-    // 确保所有内容都已处理
-    if (!full_content.empty() && accumulated_content_ != full_content) {
-        accumulated_content_ = full_content;
-        // 重新提取 res 字段（以防有遗漏）
-        std::string remaining_res = extractResDelta("");
-        if (!remaining_res.empty()) {
-            res_content_ += remaining_res;
-            processBufferedText(remaining_res);
-        }
-    }
 
-    // 发送剩余的缓存内容
     flushTTSBuffer();
 
     // 解析完整的 JSON，提取 "fc" 字段
@@ -110,98 +83,40 @@ void StreamTaskDispatcher::processComplete(const std::string& full_content) {
         fc_callback_(function_calls);
     }
 
-    // 发送结束标记给 TTS
     publishToTTS("END");
 }
 
 void StreamTaskDispatcher::reset() {
     accumulated_content_.clear();
-    res_content_.clear();
     parse_buffer_.clear();
     tts_buffer_.clear();
 }
 
 std::string StreamTaskDispatcher::extractResDelta(const std::string& delta) {
-    // 流式提取 "res":"..." 中的内容
-    // 累积到 parse_buffer_，查找 "res":" 模式，提取引号之间的内容
-    
     parse_buffer_ += delta;
     
-    // 查找 "res":"
     size_t res_start = parse_buffer_.find("\"res\":\"");
     if (res_start == std::string::npos) {
         return "";
     }
     
-    // 找到开始位置（跳过 "res":"）
-    size_t content_start = res_start + 7; // "res":" 的长度是 7
-    
-    // 查找结束引号（简单处理，不考虑转义）
+    size_t content_start = res_start + 7; 
     size_t quote_end = parse_buffer_.find('"', content_start);
+    
+    std::string current_res;
     if (quote_end == std::string::npos) {
-        // 字符串还未结束，提取当前所有内容
-        std::string current_res = parse_buffer_.substr(content_start);
-        // 计算新增部分：比较当前内容和已保存的内容
-        size_t old_len = res_content_.length();
-        if (current_res.length() > old_len) {
-            // 确保 current_res 的前 old_len 个字符与 res_content_ 相同
-            if (old_len == 0 || current_res.substr(0, old_len) == res_content_) {
-                std::string result = current_res.substr(old_len);
-                res_content_ = current_res;
-                return result;
-            } else {
-                // 如果不匹配，说明可能有重复或错误，重新计算
-                // 这种情况不应该发生，但为了安全起见
-                std::string result = current_res;
-                res_content_ = current_res;
-                return result;
-            }
-        } else if (current_res.length() < old_len) {
-            // 当前内容比已保存的短，说明可能是新的 JSON 开始，重置
-            res_content_ = current_res;
-            return current_res;
-        }
-        // 长度相等，没有新增
-        return "";
+        current_res = delta;
+    } else {
+        parse_buffer_.clear();
     }
     
-    // 字符串已完整，提取完整值
-    std::string full_res = parse_buffer_.substr(content_start, quote_end - content_start);
-    // 计算新增部分
-    size_t old_len = res_content_.length();
-    if (full_res.length() > old_len) {
-        // 确保 full_res 的前 old_len 个字符与 res_content_ 相同
-        if (old_len == 0 || full_res.substr(0, old_len) == res_content_) {
-            std::string result = full_res.substr(old_len);
-            res_content_ = full_res;
-            // 清理已处理的部分
-            parse_buffer_ = parse_buffer_.substr(quote_end + 1);
-            return result;
-        } else {
-            // 如果不匹配，返回完整内容
-            std::string result = full_res;
-            res_content_ = full_res;
-            parse_buffer_ = parse_buffer_.substr(quote_end + 1);
-            return result;
-        }
-    } else if (full_res.length() < old_len) {
-        // 完整内容比已保存的短，说明可能是新的 JSON，重置
-        res_content_ = full_res;
-        parse_buffer_ = parse_buffer_.substr(quote_end + 1);
-        return full_res;
-    }
-    
-    // 长度相等，没有新增，但需要清理缓冲区
-    parse_buffer_ = parse_buffer_.substr(quote_end + 1);
-    return "";
+    return current_res;
 }
-
 std::vector<std::string> StreamTaskDispatcher::parseFunctionCalls(const std::string& json_str) {
     std::vector<std::string> function_calls;
     
     json json_obj = json::parse(json_str);
         
-    // 提取 "fc" 字段
     if (json_obj.contains("fc") && json_obj["fc"].is_array()) {
         for (const auto& fc_item : json_obj["fc"]) {
             if (fc_item.is_string()) {
@@ -213,22 +128,23 @@ std::vector<std::string> StreamTaskDispatcher::parseFunctionCalls(const std::str
     return function_calls;
 }
 
-bool StreamTaskDispatcher::isPunctuation(const std::string& text, size_t pos, size_t& len) {
+bool StreamTaskDispatcher::isPunctuation(const std::wstring& text, size_t pos) {
     // 触发发送的标点符号：：。，、？！；
-    // UTF-8 编码的中文标点符号（每个3字节）
-    const std::vector<std::string> punctuations = {
-        "：", "。", "，", "、", "？", "！", "；"
+    const std::vector<wchar_t> punctuations = {
+        L'：', L'。', L'，', L'、', L'？', L'！', L'；'
     };
     
-    for (const auto& punct : punctuations) {
-        if (pos + punct.length() <= text.length() && 
-            text.substr(pos, punct.length()) == punct) {
-            len = punct.length();
+    if (pos >= text.length()) {
+        return false;
+    }
+    
+    wchar_t ch = text[pos];
+    for (wchar_t punct : punctuations) {
+        if (ch == punct) {
             return true;
         }
     }
     
-    len = 0;
     return false;
 }
 
@@ -237,53 +153,41 @@ void StreamTaskDispatcher::processBufferedText(const std::string& text) {
         return;
     }
     
-    std::string temp_buffer = tts_buffer_ + text;
+    std::wstring wtext = utf8ToWstring(text);
+    if (wtext.empty() && !text.empty()) {
+        std::cerr << "[StreamTaskDispatcher] Failed to convert text to wide string" << std::endl;
+        return;
+    }
+    
+    std::wstring temp_buffer = tts_buffer_ + wtext;
     
     while (true) {
-        size_t punct_pos = std::string::npos;
-        size_t punct_len = 0;
+        size_t punct_pos = std::wstring::npos;
         
-        // UTF-8 安全遍历，查找第一个标点符号
-        for (size_t i = 0; i < temp_buffer.length(); ) {
-            size_t len = 0;
-            if (isPunctuation(temp_buffer, i, len)) {
+        for (size_t i = 0; i < temp_buffer.length(); i++) {
+            if (isPunctuation(temp_buffer, i)) {
                 punct_pos = i;
-                punct_len = len;
-                std::cout << "[StreamTaskDispatcher] 检测到标点符号，位置: " << i << ", 长度: " << len << std::endl;
+                std::wcout << L"[StreamTaskDispatcher] 检测到标点符号，位置: " << i << std::endl;
                 break;
-            }
-            
-            // 移动到下一个 UTF-8 字符
-            if ((temp_buffer[i] & 0x80) == 0) {
-                i++; // ASCII 字符
-            } else if ((temp_buffer[i] & 0xE0) == 0xC0) {
-                i += 2; // 2字节 UTF-8
-            } else if ((temp_buffer[i] & 0xF0) == 0xE0) {
-                i += 3; // 3字节 UTF-8（中文）
-            } else if ((temp_buffer[i] & 0xF8) == 0xF0) {
-                i += 4; // 4字节 UTF-8
-            } else {
-                i++; // 无效字符，跳过
             }
         }
         
-        if (punct_pos == std::string::npos) {
-            // 没有找到标点符号，保留在缓存中
+        if (punct_pos == std::wstring::npos) {
             tts_buffer_ = temp_buffer;
             break;
         }
         
-        // 找到标点符号，提取标点符号之前的文本（去除标点）
-        std::string text_before_punct = temp_buffer.substr(0, punct_pos);
-        std::string text_after_punct = temp_buffer.substr(punct_pos + punct_len);
+        // 找到标点符号，提取标点符号之前的文本
+        std::wstring text_before_punct = temp_buffer.substr(0, punct_pos);
+        std::wstring text_after_punct = temp_buffer.substr(punct_pos + 1);
         
-        // 发送标点符号之前的文本（去除标点）
+        // 发送标点符号之前的文本
         if (!text_before_punct.empty()) {
-            std::cout << "[StreamTaskDispatcher] 准备发布给 TTS: \"" << text_before_punct << "\"" << std::endl;
-            publishToTTS(text_before_punct);
+            std::string utf8_text = wstringToUtf8(text_before_punct);
+            std::cout << "[StreamTaskDispatcher] 准备发布给 TTS: \"" << utf8_text << "\"" << std::endl;
+            publishToTTS(utf8_text);
         }
         
-        // 继续处理标点符号之后的文本
         temp_buffer = text_after_punct;
     }
     
@@ -291,7 +195,8 @@ void StreamTaskDispatcher::processBufferedText(const std::string& text) {
 
 void StreamTaskDispatcher::flushTTSBuffer() {
     if (!tts_buffer_.empty()) {
-        publishToTTS(tts_buffer_);
+        std::string utf8_text = wstringToUtf8(tts_buffer_);
+        publishToTTS(utf8_text);
         tts_buffer_.clear();
     }
 }

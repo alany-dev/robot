@@ -5,14 +5,9 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <locale>
+#include <codecvt>
 
-/**
- * 流式任务分发类
- * 功能：
- * 1. 流式解析 LLM 推理结果 JSON：{"res":"...", "fc":[...]}
- * 2. 流式提取 "res" 字段并发布给 TTS
- * 3. 推理结束后解析 "fc" 字段并执行函数调用
- */
 class StreamTaskDispatcher {
 public:
     using FunctionCallCallback = std::function<void(const std::vector<std::string>&)>;
@@ -28,15 +23,18 @@ private:
     FunctionCallCallback fc_callback_;
     
     std::string accumulated_content_;
-    std::string res_content_;
     std::string parse_buffer_;
-    std::string tts_buffer_;
+    
+    std::wstring tts_buffer_;
+
+    std::wstring utf8ToWstring(const std::string& utf8_str);
+    std::string wstringToUtf8(const std::wstring& wstr);
 
     std::string extractResDelta(const std::string& delta);
 
     std::vector<std::string> parseFunctionCalls(const std::string& json_str);
 
-    bool isPunctuation(const std::string& text, size_t pos, size_t& len);
+    bool isPunctuation(const std::wstring& text, size_t pos);
 
     void processBufferedText(const std::string& text);
 
