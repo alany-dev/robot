@@ -19,7 +19,7 @@ ros_ip=$(hostname -I | awk '{print $1}')
 if [ -z "$ros_ip" ]; then
     ros_ip="127.0.0.1"
 fi
-ros_master_uri="http://192.168.31.179:11311"
+ros_master_uri="http://localhost:11311"
 
 echo "stop and rm docker" 
 docker stop robot > /dev/null
@@ -44,4 +44,4 @@ docker run -it -d \
 -v ${MONITOR_HOME_DIR}:/robot \
 -v ${XDG_RUNTIME_DIR}:${XDG_RUNTIME_DIR} \
 --network host \
-robot:v1.0
+robot:v2.0

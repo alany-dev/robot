@@ -11,11 +11,15 @@ export LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH}
 cleanup() {
     echo -e "\n正在停止所有服务..."
     
-    pkill -f "sherpa-onnx-microphone" 2>/dev/null && echo -e "ASR 服务已停止" || true
+    pkill -f "sherpa-onnx-microphone-test1" 2>/dev/null && echo -e "ASR 服务已停止" || true
     
-    pkill -f "llamacpp" 2>/dev/null && echo -e "LLM 服务已停止" || true
+    pkill -f "llamacpp-ros" 2>/dev/null && echo -e "LLM 服务已停止" || true
     
     pkill -f "tts_server" 2>/dev/null && echo -e "TTS 服务已停止" || true
+
+    sleep 3
+
+    pkill -f "llamacpp-ros" 2>/dev/null && echo -e "LLM 服务已停止" || true
     
     exit 0
 }
@@ -65,7 +69,8 @@ if [ ! -z "$LLM_BIN" ]; then
     echo -e "启动 LLM: $LLM_BIN"
     echo -e "模型路径: $LLM_MODEL"
     cd "$SCRIPT_DIR"
-    "$LLM_BIN" -m "$LLM_MODEL" -t 8 &
+    taskset -c 0,1,2,3  "$LLM_BIN" -m "$LLM_MODEL" &
+
     LLM_PID=$!
     echo -e "LLM 服务已启动 (PID: $LLM_PID)"
     sleep 20
@@ -89,7 +94,7 @@ if [ ! -z "$TTS_BIN" ]; then
     echo -e "启动 TTS: $TTS_BIN"
     echo -e "模型路径: $TTS_MODEL"
     cd "$SCRIPT_DIR"
-    "$TTS_BIN" "$TTS_MODEL"  &
+    taskset -c 4,5,6,7  "$TTS_BIN" "$TTS_MODEL"  &
     TTS_PID=$!
     echo -e " TTS 服务已启动"
     sleep 2

@@ -20,16 +20,6 @@ public:
   ~Publisher() {
   }
 
-  Publisher(const Publisher & p) {
-    *this = p;
-  }
-
-  Publisher & operator = (const Publisher & p) {
-    pub_ = p.pub_;
-    pobj_ = p.pobj_;
-    return *this;
-  }
-
   template < class M >
   void publish(const M & msg) const {
     if (!pobj_)

@@ -17,7 +17,7 @@ class Subscriber;
 template < class M >
 class SubscriberCallbackHelper
 {
-  typedef void (*Func)(const boost::shared_ptr< const M > &);
+  using Func = void (*)(const boost::shared_ptr< const M > &);
 
 public:
   ~SubscriberCallbackHelper() {
@@ -68,16 +68,6 @@ public:
   }
 
   ~Subscriber() {
-  }
-
-  Subscriber(const Subscriber & s) {
-    *this = s;
-  }
-
-  Subscriber & operator = (const Subscriber & s) {
-    sub_ = s.sub_;
-    phlp_ = s.phlp_;
-    return *this;
   }
 
   void shutdown() {
