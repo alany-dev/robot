@@ -25,6 +25,9 @@ int main(int argc, char ** argv) {
     msg.data = str;
 
     ROS_INFO("info: [%s]", tmp);
+    // 混合通信
+    // 把数据写入共享内存
+    // ros pub 把handle pub出去
     p.publish(msg);
 
     ros::spinOnce();

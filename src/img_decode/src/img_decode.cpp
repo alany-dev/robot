@@ -58,12 +58,12 @@ void ImgDecode::compressed_image_callback(const sensor_msgs::CompressedImageCons
 #else
     //软解码JPEG->BGR->RGB
     image = cv::imdecode(cv::Mat(msg->data), cv::IMREAD_COLOR);
-    cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
     if (image.empty())
     {
         ROS_WARN("Failed to decode compressed image");
         return;
     }
+    cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
 #endif
 
 // auto t2 = std::chrono::system_clock::now();

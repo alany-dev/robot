@@ -8,7 +8,7 @@ project(shm_transport)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  roscpp std_msgs genmsg
+  roscpp std_msgs genmsg monitor
 )
 
 ## System dependencies are found with CMake's conventions
@@ -104,7 +104,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES shm_transport
-  CATKIN_DEPENDS roscpp
+  CATKIN_DEPENDS roscpp monitor
   DEPENDS rt
 )
 
@@ -207,3 +207,8 @@ add_dependencies(shm_talker shm_transport_generate_messages_cpp)
 add_executable(shm_listener test/shm_listener.cpp)
 target_link_libraries(shm_listener ${catkin_LIBRARIES} -lrt)
 add_dependencies(shm_listener shm_transport_generate_messages_cpp)
+
+
+add_executable(talker test/talker.cpp)
+target_link_libraries(talker ${catkin_LIBRARIES} -lrt)
+

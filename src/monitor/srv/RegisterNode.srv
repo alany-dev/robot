@@ -1,0 +1,7 @@
+# 注册节点监控请求
+string node_name          
+string process_name       
+int32 pid                
+---
+bool success             
+string message         

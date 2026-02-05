@@ -1,0 +1,5 @@
+# 注销节点监控请求
+string node_name          # 节点名称
+---
+bool success              # 注销是否成功
+string message            # 返回消息

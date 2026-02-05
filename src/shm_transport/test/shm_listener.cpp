@@ -2,6 +2,7 @@
 #include "std_msgs/String.h"
 #include "shm_transport/shm_topic.hpp"
 
+//普通函数
 void chatterCallback(const std_msgs::String::ConstPtr & msg) {
   char str[21] = {'\0'};
   strncpy(str, msg->data.c_str(), 20);
