@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+    <!-- 定义传输描述符 - 低延迟优化配置 -->
+    <transport_descriptors>
+        <transport_descriptor>
+            <transport_id>shm_transport</transport_id>
+            <type>SHM</type>
+            
+            <!-- 共享内存段大小（字节）
+                 保持64MB以确保有足够空间，避免频繁分配导致的延迟
+                 对于85MB/s的数据流，64MB可以容纳约20-30帧数据 -->
+            <segment_size>67108864</segment_size>
+            
+            <!-- 端口队列容量（消息数）-->
+            <port_queue_capacity>512</port_queue_capacity>
+            
+            <!-- 健康检查超时（毫秒）- 低延迟优化
+                 减小到500ms，加快端口健康检测，减少等待时间
+                 默认1000ms或2000ms会增加检测延迟 -->
+            <healthy_check_timeout_ms>500</healthy_check_timeout_ms>
+        </transport_descriptor>
+    </transport_descriptors>
+    
+    <!-- 参与者配置 -->
+    <participant profile_name="shm_participant" is_default_profile="true">
+        <rtps>
+            <!-- 禁用内置传输（UDP/TCP），强制使用共享内存 -->
+            <useBuiltinTransports>false</useBuiltinTransports>
+            
+            <!-- 使用共享内存传输 -->
+            <userTransports>
+                <transport_id>shm_transport</transport_id>
+            </userTransports>
+        </rtps>
+    </participant>
+</profiles>
+
