@@ -6,6 +6,9 @@
 #include <algorithm>
 #include <shm_transport/shm_topic.hpp>
 
+// 这个测试节点用于统计“共享内存方式订阅 raw 图像”时的链路时延和 FPS，
+// 方便和普通 img_decode_sub 做 A/B 对比。
+
 std::vector<double> delay_list;
 const int MAX_DELAY_LIST_SIZE = 100;
 
@@ -13,6 +16,11 @@ ros::Time last_receive_time;
 int frame_count = 0;
 double fps = 0.0;
 
+/**
+ * 统计共享内存 raw 图像传输时延。
+ *
+ * @param msg 一帧从共享内存反序列化出来的 raw 图像消息。
+ */
 void imageCallback(const sensor_msgs::Image::ConstPtr& msg)
 {
     printf("[SHM IMG DECODE TEST]: Received image [%s]:\n", msg->header.frame_id.c_str());
@@ -27,7 +35,8 @@ void imageCallback(const sensor_msgs::Image::ConstPtr& msg)
         return;
     }
     
-   ros::Duration delay = receive_time - publish_time;
+    // 口径与普通 ROS 版保持一致：receive_time - header.stamp。
+    ros::Duration delay = receive_time - publish_time;
     double delay_ms = delay.toSec() * 1000.0;
     
     delay_list.push_back(delay_ms);
@@ -65,6 +74,8 @@ int main(int argc, char **argv)
     std::string image_topic = "/camera/image_raw";
     n.param<std::string>("image_topic", image_topic, "/camera/image_raw");
     
+    // 通过 shm_transport 订阅 raw 图像，ROS 网络里收到的是 handle，
+    // 回调里拿到的则是还原后的真实 sensor_msgs/Image。
     shm_transport::Topic shm_topic(n);
     shm_transport::Subscriber<sensor_msgs::Image> shm_sub = shm_topic.subscribe(image_topic, 1000, imageCallback);
     

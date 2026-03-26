@@ -4,13 +4,22 @@
 
 using namespace std;
 
+// 普通 ROS 压缩图像订阅对照测试：
+// 用来和 shm_sub.cc 的共享内存版本比较“压缩图像跨进程传输”的 FPS 和时延。
+
 // 统计变量
 unsigned int recv_frames = 0;
 double start_time = 0.0;
 double max_fps = 0.0, min_fps = 1000.0;
 double last_recv_time = 0.0;
 
-// 订阅回调函数
+/**
+ * 统计普通 ROS 订阅压缩图像的接收 FPS 和消息时延。
+ *
+ * @param msg CompressedImage：
+ *            - header.stamp: 采集节点发布时间；
+ *            - data:         JPEG 压缩图像数据。
+ */
 void imageCallback(const sensor_msgs::CompressedImage::ConstPtr &msg)
 {
     double current_time = ros::Time::now().toSec();
@@ -26,7 +35,7 @@ void imageCallback(const sensor_msgs::CompressedImage::ConstPtr &msg)
     max_fps = max(max_fps, current_fps);
     min_fps = min(min_fps, current_fps);
 
-    // 统计消息延迟（发布时间-接收时间）
+    // 当前口径：接收时间 - 发布时间。
     double msg_delay = (current_time - msg->header.stamp.toSec()) * 1000; // 毫秒
 
     recv_frames++;
@@ -51,7 +60,7 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "image_subscriber");
     ros::NodeHandle nh;
 
-    // 订阅图像话题，使用标准ROS订阅
+    // 使用标准 ROS 订阅方式，作为共享内存版本的对照组。
     ros::Subscriber sub = nh.subscribe("/image_raw/compressed", 1000, imageCallback);
 
     ros::spin();

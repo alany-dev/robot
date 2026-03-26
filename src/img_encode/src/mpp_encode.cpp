@@ -9,6 +9,7 @@ MppEncode::MppEncode()
 
 MppEncode::~MppEncode()
 {
+    // 编码器析构时先 reset，再按逆序释放上下文和 buffer。
     MPP_RET ret = MPP_OK;
     ret = mpp_enc_data.mpi->reset(mpp_enc_data.ctx);
     if (ret)
@@ -29,6 +30,13 @@ MppEncode::~MppEncode()
     }
 }
 
+/**
+ * 初始化 MPP JPEG 编码器。
+ *
+ * @param wid          输入图像宽度。
+ * @param hei          输入图像高度。
+ * @param jpeg_quality JPEG 编码质量。
+ */
 void MppEncode::init(int wid,int hei,int jpeg_quality)
 {
     //清空配置
@@ -38,13 +46,13 @@ void MppEncode::init(int wid,int hei,int jpeg_quality)
     mpp_enc_data.height = hei;
     int fps = 30;
 
-    //mpp编码图像的行和列都是按16位对齐的，如果输出的行列不是16的整数，则需要在编码时将数据按照16位对齐。
-    //此函数就是为了得到行列补齐16整除的数据，比如行是30，通过MPP_ALIGN（30，16）；的输出就是32；
+    // MPP 编码时通常要求 stride 做 16 对齐。
+    // 宽度不足 16 的整数倍时，也要按对齐后的 stride 申请输入 buffer。
     mpp_enc_data.hor_stride = MPP_ALIGN(mpp_enc_data.width, 16);
     mpp_enc_data.ver_stride = mpp_enc_data.height; //MPP_ALIGN(mpp_enc_data.height, 16);
     //实测高度是360的时候，也可以正常运行，高度不用是16的倍数
 
-    //经测试，只有MPP_FMT_YUV420SP(Y+UV交替)和MPP_FMT_YUV420P(Y+U+V)才可以
+    // 这里固定使用 YUV420P，因为上游 RGA 已经把 RGB 转好了。
     mpp_enc_data.fmt = MPP_FMT_YUV420P;
     mpp_enc_data.type = MPP_VIDEO_CodingMJPEG;//MPP_VIDEO_CodingAVC;
     mpp_enc_data.fps = fps;
@@ -119,7 +127,8 @@ void MppEncode::init(int wid,int hei,int jpeg_quality)
         goto MPP_INIT_OUT;
     }
 
-    /*设置编码码率、质量、定码率变码率*/
+    /* 设置码率和质量策略。
+     * 当前虽然编码的是 MJPEG，但这里仍沿用 MPP 的统一 RC 配置接口。 */
     mpp_enc_data.rc_cfg.change  = MPP_ENC_RC_CFG_CHANGE_ALL;
     mpp_enc_data.rc_cfg.rc_mode = MPP_ENC_RC_MODE_VBR;//CBR 为 Constant Bit Rate，固定码率模式。在固定码率模式下，目标码率起决定性作用。
     //VBR 为 Variable Bit Rate，可变码率模式。在可变码率模式下，最大最小码率起决定性作用。
@@ -189,7 +198,7 @@ void MppEncode::init(int wid,int hei,int jpeg_quality)
     }
 
 
-    /*设置编码参数：宽高、对齐后宽高等参数*/
+    /* 设置输入帧几何信息：宽高、stride、像素格式。 */
    //mpp_enc_data.bps = mpp_enc_data.width * mpp_enc_data.height / 8 * mpp_enc_data.fps;
    mpp_enc_data.prep_cfg.change        = MPP_ENC_PREP_CFG_CHANGE_INPUT |
            MPP_ENC_PREP_CFG_CHANGE_ROTATION |
@@ -209,7 +218,7 @@ void MppEncode::init(int wid,int hei,int jpeg_quality)
        goto MPP_INIT_OUT;
    }
 
-    /*设置264相关的其他编码参数*/
+    /* 设置编码格式相关参数。当前分支主要走 MJPEG。 */
     mpp_enc_data.codec_cfg.coding = mpp_enc_data.type;
 
     switch (mpp_enc_data.codec_cfg.coding)
@@ -249,6 +258,7 @@ void MppEncode::init(int wid,int hei,int jpeg_quality)
         case MPP_VIDEO_CodingMJPEG :
         {
             mpp_enc_data.codec_cfg.jpeg.change  = MPP_ENC_JPEG_CFG_CHANGE_QP;
+            // JPEG quant 直接决定压缩质量。
             mpp_enc_data.codec_cfg.jpeg.quant   = jpeg_quality;//JPEG编码质量设置
         }
         break;
@@ -320,13 +330,23 @@ MPP_INIT_OUT:
     printf("init mpp failed!\n");
 }
 
+/**
+ * 编码一帧 YUV420P 图像。
+ *
+ * @param in_data   输入 YUV420P 数据。
+ * @param in_size   输入数据总字节数。
+ * @param jpeg_data 输出 JPEG 字节流。
+ * @return          0 成功；非 0 表示 put_frame / get_packet 失败。
+ */
 int MppEncode::encode(unsigned char *in_data, int in_size,std::vector<unsigned char> &jpeg_data)
 {
 	MPP_RET ret = MPP_OK;
 	MppPacket packet = NULL;
 
+    // 把当前帧数据拷贝进 MPP 输入 buffer。
     memcpy(buf_ptr, in_data, in_size);
 
+	// 把输入 frame 送进编码器。
   	ret = mpp_enc_data.mpi->encode_put_frame(mpp_enc_data.ctx, frame);
 	if (ret)
 	{
@@ -334,6 +354,7 @@ int MppEncode::encode(unsigned char *in_data, int in_size,std::vector<unsigned c
         return ret;
 	}
 
+	// 从编码器拉取输出 packet，即 JPEG 字节流。
 	ret = mpp_enc_data.mpi->encode_get_packet(mpp_enc_data.ctx, &packet);
 	if (ret)
 	{
@@ -347,8 +368,7 @@ int MppEncode::encode(unsigned char *in_data, int in_size,std::vector<unsigned c
         return -1;
     }
 
-    // send packet here
-    //ptr是编码后的数据
+    // ptr 指向编码后的 JPEG 数据。
     uint8_t *ptr  = (uint8_t*)mpp_packet_get_pos(packet);
     size_t   len  = mpp_packet_get_length(packet);
     if(len<=0)
@@ -359,6 +379,7 @@ int MppEncode::encode(unsigned char *in_data, int in_size,std::vector<unsigned c
     
     jpeg_data.assign(ptr,ptr+len);
 
+    // deinit 会释放 packet，因此必须先把数据拷贝到 jpeg_data 再释放。
     mpp_packet_deinit(&packet);//会释放packet，所以需要在上面将packet数据拷贝出去
 
 	return 0;
@@ -366,4 +387,3 @@ int MppEncode::encode(unsigned char *in_data, int in_size,std::vector<unsigned c
 
 
 #endif
-

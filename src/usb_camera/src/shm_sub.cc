@@ -5,13 +5,20 @@
 
 using namespace std;
 
+// 共享内存压缩图像订阅测试：
+// 用于和 test_sub.cc 对比“压缩图像这一级如果改走共享内存，性能是否更好”。
+
 // 统计变量
 unsigned int recv_frames = 0;
 double start_time = 0.0;
 double max_fps = 0.0, min_fps = 1000.0;
 double last_recv_time = 0.0;
 
-// 订阅回调函数
+/**
+ * 统计共享内存订阅压缩图像的接收 FPS 和时延。
+ *
+ * @param msg 从共享内存反序列化后的 CompressedImage。
+ */
 void imageCallback(const sensor_msgs::CompressedImage::ConstPtr &msg)
 {
     double current_time = ros::Time::now().toSec();
@@ -27,7 +34,7 @@ void imageCallback(const sensor_msgs::CompressedImage::ConstPtr &msg)
     max_fps = max(max_fps, current_fps);
     min_fps = min(min_fps, current_fps);
 
-    // 统计消息延迟（发布时间-接收时间）
+    // 口径仍然保持一致：接收时间 - 发布时间。
     double msg_delay = (current_time - msg->header.stamp.toSec()) * 1000; // 毫秒
 
     recv_frames++;
@@ -52,7 +59,7 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "image_subscriber");
     ros::NodeHandle nh;
 
-    // 订阅图像话题，使用共享内存传输
+    // 使用共享内存传输订阅压缩图像，大消息不再走普通 ROS loopback socket。
     shm_transport::Topic shm_topic(nh);
     shm_transport::Subscriber<sensor_msgs::CompressedImage> shm_sub = shm_topic.subscribe("/image_raw/compressed", 1000, imageCallback);
 

@@ -1,6 +1,8 @@
 #include "shm_img_decode.h"
 #include <thread>
 
+// shm_img_decode 的目标是把“解码后的大 raw 图像”这一步从 ROS loopback socket
+// 切换到共享内存传输，从而观察 raw 图像跨进程通信时延的改善情况。
 
 ImgDecode::ImgDecode() : nh("~") 
 {
@@ -16,6 +18,7 @@ ImgDecode::ImgDecode() : nh("~")
     nh.param<int>("width", width, 1280);
     nh.param<int>("height", height, 720);
 
+    // 下游 raw 图像通过共享内存发布。
     shm_transport::Topic shm_topic(nh);
     shm_raw_image_pub = shm_topic.advertise<sensor_msgs::Image>(pub_raw_image_topic, 1, 300 * 1024 * 1024);
     
@@ -32,6 +35,7 @@ void ImgDecode::compressed_image_callback(const sensor_msgs::CompressedImageCons
 
     frame_cnt++;
 
+    // 和普通 img_decode 一样，先做分频，避免后续解码和缩放白跑。
     if(frame_cnt%fps_div!=0)//分频 减少后续处理负担
     {
         return;
@@ -63,6 +67,7 @@ void ImgDecode::compressed_image_callback(const sensor_msgs::CompressedImageCons
     cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
 #endif
 
+    // 继续沿用采集节点的时间戳，便于和普通 ROS 版做同口径时延对比。
     msg_pub.header = msg->header;//使用原有时间戳
     msg_pub.height = image.rows * scale;
     msg_pub.width =  image.cols * scale;
@@ -81,6 +86,7 @@ void ImgDecode::compressed_image_callback(const sensor_msgs::CompressedImageCons
     memcpy(msg_pub.data.data(), image.data, msg_pub.height * msg_pub.width * 3);
 #endif
     
+    // 发布 raw 图像时走共享内存。
     shm_raw_image_pub.publish(msg_pub);
         
 }
@@ -91,11 +97,13 @@ void ImgDecode::run_check_thread()
     while(ros::ok())
     {
         int subscribers = shm_raw_image_pub.getNumSubscribers();
+        // 无人消费共享内存 raw 图像时，直接停掉上游压缩图像订阅。
         if(subscribers==0 && last_subscribers>0)
         {
             ROS_INFO("decode image subscribers = 0, src sub shutdown");
             compressed_image_sub.shutdown();
         }
+        // 一旦有人订阅共享内存输出，再恢复上游订阅。
         else if(subscribers>0 && last_subscribers==0)
         {
             ROS_INFO("decode image subscribers > 0, src sub start");
@@ -116,6 +124,7 @@ int main(int argc, char** argv)
 
     ImgDecode img_decode;
 
+    // 独立线程负责按需开关上游订阅。
     std::thread check_thread(&ImgDecode::run_check_thread, &img_decode);
 
     ros::spin();

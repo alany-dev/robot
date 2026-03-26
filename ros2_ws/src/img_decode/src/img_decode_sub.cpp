@@ -7,6 +7,9 @@
 
 using namespace std;
 
+// ROS2 raw 图像时延测试节点：
+// 口径与 ROS1 测试一致，都是 receive_time - header.stamp。
+
 std::vector<double> delay_list;
 const int MAX_DELAY_LIST_SIZE = 100;
 
@@ -25,7 +28,8 @@ public:
         std::string image_topic;
         this->get_parameter("image_topic", image_topic);
 
-        // 订阅图像话题 - 优化 QoS：历史深度=1，只保留最新消息，避免旧数据堆积导致频率过高
+        // 测试端 QoS 也和主链路保持一致：
+        // depth=1 + best_effort + volatile，只关心最新消息。
         rclcpp::QoS qos_profile(1);
         qos_profile.best_effort();  
         qos_profile.durability_volatile(); 
@@ -37,6 +41,9 @@ public:
     }
 
 private:
+    /**
+     * @param msg 一帧 raw 图像消息。
+     */
     void image_callback(const sensor_msgs::msg::Image::SharedPtr msg)
     {
        
@@ -53,6 +60,7 @@ private:
             return;
         }
 
+        // 当前口径：接收时间 - 发布时间戳。
         rclcpp::Duration delay = receive_time - publish_time;
         double delay_ms = delay.nanoseconds() / 1000000.0; 
 
@@ -84,6 +92,7 @@ private:
         printf("----------------------------------------\n");
     }
 
+    // 订阅对象本身。
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
 };
 

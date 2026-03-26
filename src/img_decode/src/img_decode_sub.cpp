@@ -5,6 +5,9 @@
 #include <numeric>
 #include <algorithm>
 
+// 这个测试节点用于统计“普通 ROS 方式订阅 raw 图像”时的链路时延和 FPS。
+// 口径统一为：receive_time - msg->header.stamp。
+
 // 全局变量：存储最近100帧的通信时延（毫秒），避免数据过多
 std::vector<double> delay_list;
 const int MAX_DELAY_LIST_SIZE = 100;
@@ -14,6 +17,13 @@ ros::Time last_receive_time;
 int frame_count = 0;
 double fps = 0.0;
 
+/**
+ * 统计普通 ROS raw 图像传输时延。
+ *
+ * @param msg 一帧 raw 图像消息：
+ *            - header.stamp: img_decode 发布时沿用的采集时间戳；
+ *            - data:         当前图像像素数据。
+ */
 void imageCallback(const sensor_msgs::Image::ConstPtr& msg)
 {
     // 1. 基础信息打印（图像信息）
@@ -31,7 +41,7 @@ void imageCallback(const sensor_msgs::Image::ConstPtr& msg)
         return;
     }
     
-    // 时延计算：秒→毫秒（更直观）
+    // 时延计算：当前接收时间 - 发送时间戳。
     ros::Duration delay = receive_time - publish_time;
     double delay_ms = delay.toSec() * 1000.0;
     
@@ -78,7 +88,7 @@ int main(int argc, char **argv)
     std::string image_topic = "/camera/image_raw";
     n.param<std::string>("image_topic", image_topic, "/camera/image_raw");
     
-    // 订阅图像话题：使用普通ROS传输
+    // 使用普通 ROS 订阅方式接收 raw 图像，作为共享内存方案的对照组。
     ros::Subscriber sub = n.subscribe<sensor_msgs::Image>(image_topic, 1000, imageCallback);
     
     ROS_INFO("IMG DECODE SUB client start! Waiting for %s topic...", image_topic.c_str());

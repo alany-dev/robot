@@ -23,28 +23,44 @@
 
 //输入形式：话题(配合其他摄像头、RTSP等采集节点使用)，或图片文件夹(离线测试)
 //输出形式：话题，或图片文件（图片文件用于测试）
+//
+// 这一级是低时延视觉链路的核心计算节点：
+// - 前一层 img_decode 已经把大图压缩成 640x360 左右的小图；
+// - 这里再做模型输入 resize、NPU 推理、后处理和结果发布；
+// - 为了避免“回调线程越积越慢”，本节点内部又拆成了两段短队列流水线。
 RknnRun::RknnRun():nh("~")
 {
+    // model_file:
+    // RKNN 模型文件路径，例如 yolov6n_85.rknn。
     nh.param<std::string>("model_file", model_file, ""); //$(find rknn_yolo)/config/xxx.rknn
+
+    // yaml_file:
+    // 类别数和标签名配置文件路径。
     nh.param<std::string>("yaml_file", yaml_file, "");
+
+    // 离线调试模式下输入图片目录和输出结果目录。
     nh.param<std::string>("offline_images_path", offline_images_path, "");
     nh.param<std::string>("offline_output_path", offline_output_path, "");
 
+    // 在线模式下的输入和输出话题。
     nh.param<std::string>("sub_image_topic", sub_image_topic, "/camera/image_raw");
     nh.param<std::string>("pub_image_topic", pub_image_topic, "/camera/image_det");
     nh.param<std::string>("pub_det_topic", pub_det_topic, "/ai_msg_det");
 
+    // 是否切换到离线图片测试模式。
     nh.param<bool>("is_offline_image_mode", is_offline_image_mode, false);//离线用于图片测试
 
+    // 运行期调试 / 性能配置。
     nh.param<bool>("print_perf_detail", print_perf_detail, false);
     nh.param<bool>("use_multi_npu_core", use_multi_npu_core, false);
     nh.param<bool>("output_want_float", output_want_float, false);
 
+    // 置信度阈值和 NMS 阈值。
     nh.param<double>("conf_threshold", conf_threshold, 0.25);
     nh.param<double>("nms_threshold", nms_threshold, 0.45);
     
 
-    //读取classes配置
+    // 读取类别数和标签名，这样后处理后发布的是“person / car”而不是纯数字 id。
     cv::FileStorage fs(yaml_file, cv::FileStorage::READ);
     if(!fs.isOpened())
     {
@@ -58,17 +74,23 @@ RknnRun::RknnRun():nh("~")
 
     printf("cls_num (nc) =%d label_names len=%d\n",cls_num,label_names.size());
 
+    // 发布画框图像。
     image_pub = nh.advertise<sensor_msgs::Image>(pub_image_topic, 10);
 
-    //det_pub = nh.advertise<std_msgs::String>(pub_det_topic, 10);
+    // 发布结构化检测框消息，供 object_track 做同步跟踪。
     det_pub = nh.advertise<ai_msgs::Dets>(pub_det_topic, 10);
 
-    //image_sub = nh.subscribe(sub_image_topic, 10, &RknnRun::sub_image_callback,this);
+    // image_sub 不在构造时立刻订阅，而是交给 run_check_thread 按需打开。
 }
 
+/**
+ * 图像订阅回调只做一件事：把输入图像送到短队列里。
+ *
+ * @param msg 一帧 RGB 图像。这里不做任何耗时计算，避免 ROS 回调线程被阻塞。
+ */
 void RknnRun::sub_image_callback(const sensor_msgs::ImageConstPtr& msg)
 {
-    //ROS_WARN_STREAM("frame_id="<<msg->header.frame_id);
+    // 通过短队列把“推理速度”和“上游来帧速度”解耦。
     capture_data_queue.push(msg);
 }
 
@@ -82,6 +104,18 @@ void sig_handler(int sig)
     }
 }
 
+/**
+ * 推理线程。
+ *
+ * 执行顺序：
+ * 1. 初始化 RKNN 上下文；
+ * 2. 从 capture_data_queue 拿最新图像；
+ * 3. 视需要用 RGA resize 到模型输入尺寸；
+ * 4. 调用 RKNN 推理；
+ * 5. 把原图、header 和 outputs 一起打包进 process_data_queue。
+ *
+ * @return 正常离线模式跑完时返回 0。
+ */
 int RknnRun::run_infer_thread()
 {
 
@@ -106,6 +140,13 @@ int RknnRun::run_infer_thread()
         ros::shutdown();
     }
 
+    // rknn_load 参数说明：
+    // - ctx:                  输出参数，返回 RKNN 上下文；
+    // - model_file.c_str():   模型文件路径；
+    // - model_data:           若使用内存模型则传内存指针，这里为 nullptr，表示从文件加载；
+    // - io_num:               输出参数，返回模型输入输出 tensor 数量；
+    // - print_perf_detail:    是否打印每层耗时；
+    // - use_multi_npu_core:   是否启用多 NPU Core。
     ret = rknn_load(ctx,model_file.c_str(),model_data,io_num,print_perf_detail,use_multi_npu_core);
     if(ret<0)
     {
@@ -115,6 +156,13 @@ int RknnRun::run_infer_thread()
 
     rknn_input inputs[io_num.n_input];
 
+    // rknn_config 参数说明：
+    // - ctx / io_num:         已加载模型的 RKNN 上下文与 IO 信息；
+    // - model_width/height:   输出参数，返回模型输入宽高；
+    // - inputs:               输出参数，返回已准备好的输入 tensor 描述；
+    // - infer_data.outputs:   输出参数，返回输出 tensor 描述数组；
+    // - out_scales/out_zps:   输出参数，量化模型反量化所需参数；
+    // - output_want_float:    是否要求 RKNN 直接给 float 输出。
     ret = rknn_config(ctx,io_num,model_width,model_height,inputs,infer_data.outputs,out_scales,out_zps,output_want_float);
     if(ret<0)
     {
@@ -181,6 +229,7 @@ int RknnRun::run_infer_thread()
         }
         else
         {
+            // 在线模式下，从短队列里取“最近的一帧”，而不是等待每一帧都算完。
             sensor_msgs::ImageConstPtr msg;
             capture_data_queue.wait_and_pop(msg);
 
@@ -191,6 +240,8 @@ int RknnRun::run_infer_thread()
                 continue;
             }
 
+            // 这里 clone 一份，是为了把数据所有权和原始 ROS 消息生命周期解耦。
+            // 后续推理线程和后处理线程都可能继续访问这张图。
             infer_data.orig_img = cv_ptr->image.clone();//接收的ROS消息已经是RGB格式了，不需要再转换为RGB用于推理
             infer_data.header = msg->header;
         }
@@ -207,7 +258,7 @@ int RknnRun::run_infer_thread()
         //ROS_INFO("start infer");
 
 //auto t1 = std::chrono::system_clock::now();
-        //缩放
+        // 如果原图尺寸和模型输入不一致，就先用 RGA 缩放到模型输入尺寸。
         if(img_width != model_width || img_height != model_height)
         {
             rga_resize(infer_data.orig_img,img_resize,infer_data.mod_size);
@@ -215,6 +266,7 @@ int RknnRun::run_infer_thread()
         }
         else
         {
+            // 尺寸已匹配时，直接把原图地址作为模型输入，少一次 resize。
             inputs[0].buf = (void*)infer_data.orig_img.data;
         }
 
@@ -222,10 +274,10 @@ int RknnRun::run_infer_thread()
         // cv::waitKey(1);
 
 //auto t2 = std::chrono::system_clock::now();
-        //1输入数据
+        // 1. 设置输入 tensor。
         rknn_inputs_set(ctx, io_num.n_input, inputs);
 
-        //2运行推理
+        // 2. 运行 NPU 推理。
         ret = rknn_run(ctx, NULL);
 
         if(print_perf_detail)//是否打印每层运行时间
@@ -236,7 +288,7 @@ int RknnRun::run_infer_thread()
         }
 
 
-        //3读取结果
+        // 3. 拉取输出 tensor。
         ret = rknn_outputs_get(ctx, io_num.n_output, infer_data.outputs, NULL);
 
         //ROS_INFO("end infer");
@@ -249,6 +301,7 @@ int RknnRun::run_infer_thread()
 //         ROS_WARN_THROTTLE(1,"rga_resize=%d ms rknn_run=%d ms infer_fps=%.1f",time1,time2,1000.0/(time1+time2));
 #endif
 
+        // 把“原图 + 原时间戳 + 模型输出”整体交给后处理线程。
         process_data_queue.push(infer_data);
 
 
@@ -267,6 +320,16 @@ int RknnRun::run_infer_thread()
 
 
 
+/**
+ * 后处理线程。
+ *
+ * 职责：
+ * 1. 从 process_data_queue 取一帧推理结果；
+ * 2. 执行解码 / 反量化 / NMS；
+ * 3. 在图上画框；
+ * 4. 发布带框图像和结构化检测框；
+ * 5. 及时释放 RKNN 输出 buffer。
+ */
 int RknnRun::run_process_thread()
 {
 
@@ -328,6 +391,7 @@ int RknnRun::run_process_thread()
         InferData infer_data;
         process_data_queue.wait_and_pop(infer_data);
 
+        // 画框直接改图会污染原始输入，因此在后处理线程里单独 clone 一份。
         cv::Mat infer_data_orig_img = infer_data.orig_img.clone();//拷贝一份绘制，否则会影响到原始图片data
 
 #if(USE_ARM_LIB==1)
@@ -345,7 +409,27 @@ int RknnRun::run_process_thread()
 //auto t1 = std::chrono::system_clock::now();
 
 #if(USE_ARM_LIB==1)
-        //4后处理
+        // post_process 参数说明：
+        // - outputs[out_index[0]].want_float:
+        //     当前输出是否已经是 float，决定后处理里如何解释 tensor。
+        // - outputs[out_index[0]].buf / outputs[out_index[1]].buf / outputs[out_index[2]].buf:
+        //     YOLO 三个输出头的 tensor 地址。
+        // - mod_size.height / mod_size.width:
+        //     模型输入尺寸。
+        // - conf_threshold / nms_threshold:
+        //     置信度和 NMS 阈值。
+        // - scale_w / scale_h:
+        //     从模型输入尺寸映射回原图尺寸的缩放比例。
+        // - out_zps / out_scales:
+        //     量化模型输出反量化所需参数。
+        // - out_index:
+        //     指定哪几个输出头参与后处理。
+        // - label_names / cls_num:
+        //     类别名字和类别总数。
+        // - dets:
+        //     输出参数，最终得到的检测框列表。
+        //
+        // 4. 后处理：解码框、按阈值过滤并执行 NMS。
         post_process(outputs[out_index[0]].want_float,
                    outputs[out_index[0]].buf,outputs[out_index[1]].buf,outputs[out_index[2]].buf, mod_size.height, mod_size.width,
                    conf_threshold, nms_threshold, scale_w, scale_h,
@@ -380,6 +464,7 @@ int RknnRun::run_process_thread()
 
 //auto t2 = std::chrono::system_clock::now();
 
+        // dets_msg 只承载结构化结果，不承载绘制后的像素数据。
         ai_msgs::Dets dets_msg;
         //nlohmann::json json_dets;
         for(int i = 0; i < dets.size(); i++)
@@ -407,6 +492,7 @@ int RknnRun::run_process_thread()
             // // 将单个目标框信息添加到JSON数组中
             // json_dets.push_back(det);
 
+            // 把内部 Det 转成 ROS 消息，供 object_track 做同步订阅。
             ai_msgs::Det det;
             det.x1 = dets[i].x1;
             det.y1 = dets[i].y1;
@@ -429,7 +515,10 @@ int RknnRun::run_process_thread()
         //cv::waitKey(1);
 
 #if(USE_ARM_LIB==1)
-        //5释放输出outputs 必须释放，不然代码运行一会儿会崩溃 因此，后处理时间一定要比推理时间要短，否则队列会有丢弃的可能，会出现outputs没有释放
+        // 5. 释放 outputs：
+        // 这一步必须及时执行，否则 RKNN 内部的输出 buffer 会越积越多。
+        // 当前设计要求“后处理平均耗时不要长期慢于推理耗时”，否则短队列虽然能丢帧，
+        // 但未 release 的 outputs 仍然会成为资源风险。
         ret = rknn_outputs_release(ctx, io_num.n_output, outputs);
 #endif
 
@@ -451,6 +540,7 @@ int RknnRun::run_process_thread()
            last_t = t;
         }
 
+        // 发布带框图像时继续沿用输入 header，保证和 dets_msg 能按同一时间戳同步。
         image_msg = cv_bridge::CvImage(infer_data.header, "rgb8", infer_data_orig_img).toImageMsg();//opencv-->ros
         image_pub.publish(image_msg);//发布绘制了检测框的图像
 
@@ -458,6 +548,7 @@ int RknnRun::run_process_thread()
         // json_msg.data = json_str;
         // det_pub.publish(json_msg);//发布json字符串
 
+        // 检测框消息使用同一份时间戳，object_track 因此可以直接用 ExactTime 同步。
         dets_msg.header = infer_data.header;//时间戳赋值用于同步订阅
         det_pub.publish(dets_msg);
 
@@ -474,17 +565,26 @@ int RknnRun::run_process_thread()
 }
 
 
+/**
+ * 根据是否真的有人消费检测图像，决定是否订阅上游图像。
+ *
+ * 这样做的直接收益是：如果没有任何人使用当前 RKNN 检测结果，
+ * 这个节点不会继续订阅 /camera/image_raw，也就不会占用 NPU 和 CPU。
+ */
 void RknnRun::run_check_thread()
 {
     int last_subscribers = 0;
     while(ros::ok())
     {
         int subscribers = image_pub.getNumSubscribers();
+
+        // 检测图像无人订阅时，直接断开上游输入。
         if(subscribers==0 && last_subscribers>0)
         {
             ROS_INFO("det image subscribers = 0, src sub shutdown");
             image_sub.shutdown();
         }
+        // 一旦有人开始订阅结果图，再恢复订阅输入图像。
         else if(subscribers>0 && last_subscribers==0)
         {
             ROS_INFO("det image subscribers > 0, src sub start");
@@ -496,4 +596,3 @@ void RknnRun::run_check_thread()
         usleep(100*1000);//100ms
     }
 }
-

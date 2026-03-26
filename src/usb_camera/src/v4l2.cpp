@@ -3,19 +3,31 @@
 #define LOG ROS_INFO
 
 
+/**
+ * 按低时延链路需要初始化 V4L2 采集。
+ *
+ * 这里的核心目标不是“支持尽可能多的格式”，而是把摄像头固定到
+ * MJPEG + 目标分辨率 + 30fps 上，为后面“压缩流传输 -> 硬解码 -> 推理”
+ * 这条路径提供稳定输入。
+ *
+ * @param dev_name 摄像头设备路径，例如 "/dev/video0"。
+ * @param width    希望设置的采集宽度。
+ * @param height   希望设置的采集高度。
+ * @return         0 表示成功；非 0 表示某一步 ioctl 失败。
+ */
 int V4l2::init_video(const char *dev_name,int width,int height)
 {
     struct v4l2_fmtdesc fmtdesc;
     int i, ret;
 
-    // Open Device
+    // Open Device 打开设备
     fd = open(dev_name, O_RDWR, 0);
     if (fd < 0) {
         LOG("Open %s failed!!!", dev_name);
         return -1;
     }
 
-    // Query Capability
+    // Query Capability  查询能力
     struct v4l2_capability cap;
     ret = ioctl(fd,VIDIOC_QUERYCAP,&cap);
     if (ret < 0) {
@@ -23,7 +35,7 @@ int V4l2::init_video(const char *dev_name,int width,int height)
         return ret;
     }
 
-    // Set Stream Format
+    // 枚举摄像头支持的格式，日志里可以直观看到是否真的支持 MJPEG。
     fmtdesc.index=0;
     fmtdesc.type=V4L2_BUF_TYPE_VIDEO_CAPTURE;
     LOG("Support format:");
@@ -33,6 +45,10 @@ int V4l2::init_video(const char *dev_name,int width,int height)
         fmtdesc.index++;
     }
 
+    // 设置采集输出格式：
+    // - width / height: 希望摄像头输出的分辨率；
+    // - pixelformat:    这里固定选 MJPEG，直接拿压缩帧；
+    // - field:          场类型，一般保持默认的隔行字段配置即可。
     struct v4l2_format fmt;
     memset(&fmt, 0, sizeof(fmt));
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -47,13 +63,16 @@ int V4l2::init_video(const char *dev_name,int width,int height)
         return ret;
     }
 
-    // Get Stream Format
+    // 再读回一次驱动最终生效的格式，避免用户以为请求值一定被完全接受。
     ret = ioctl(fd, VIDIOC_G_FMT, &fmt);
     if (ret < 0) {
         LOG("VIDIOC_G_FMT failed (%d)", ret);
         return ret;
     }
 
+    // 设置采样帧率：
+    // numerator / denominator = 1 / 30，表示目标采样周期为 1/30 秒。
+    // capturemode 保持为 1，沿用当前代码里对驱动的兼容配置。
     struct v4l2_streamparm param;
     memset(&param,0,sizeof(param));
     param.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -73,7 +92,7 @@ int V4l2::init_video(const char *dev_name,int width,int height)
         return ret;
     }
 
-    // Print Stream Format
+    // 打印驱动最终接受的流配置，方便定位“请求了 1280x720，驱动却给了别的值”的问题。
     LOG("Stream Format Informations:");
     LOG(" type: %d", fmt.type);
     LOG(" width: %d", fmt.fmt.pix.width);
@@ -90,7 +109,10 @@ int V4l2::init_video(const char *dev_name,int width,int height)
     //LOG(" priv: %d", fmt.fmt.pix.priv);
     //LOG(" raw_date: %s", fmt.fmt.raw_data);
 
-    // Request buffers
+    // 向驱动申请 mmap 缓冲区：
+    // - type:   视频采集缓冲区；
+    // - memory: V4L2_MEMORY_MMAP，表示用户态通过 mmap 直接访问驱动缓冲；
+    // - count:  申请 BUFFER_COUNT 个环形缓冲区。
     struct v4l2_requestbuffers reqbuf;
     reqbuf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     reqbuf.memory = V4L2_MEMORY_MMAP;
@@ -101,11 +123,12 @@ int V4l2::init_video(const char *dev_name,int width,int height)
         return ret;
     }
 
-
-    // Queen buffers
+    // 查询并映射每个驱动缓冲区，然后预先全部 QBUF 回队列。
+    // 这样 STREAMON 之后驱动可以立刻开始写入采集数据。
     for(i=0; i<BUFFER_COUNT; i++)
     {
-        // Query buffer
+        // Query buffer:
+        // 根据 index 取回该缓冲区的长度和偏移量。
         buf.index = i;
         buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         buf.memory = V4L2_MEMORY_MMAP;
@@ -114,7 +137,8 @@ int V4l2::init_video(const char *dev_name,int width,int height)
             LOG("VIDIOC_QUERYBUF (%d) failed (%d)", i, ret);
             return ret;
         }
-        // mmap buffer
+        // mmap buffer:
+        // 把驱动缓冲区映射进当前进程地址空间，后续读取帧数据时就不需要 read() 拷贝。
         mmap_buffer[i].length= buf.length;
         mmap_buffer[i].start = (unsigned char *)mmap(0, buf.length, 
             PROT_READ|PROT_WRITE, MAP_SHARED, fd, buf.m.offset);
@@ -122,7 +146,8 @@ int V4l2::init_video(const char *dev_name,int width,int height)
             LOG("mmap (%d) failed: %s", i, strerror(errno));
             return -1;
         }
-        // Queen buffer
+        // QBUF:
+        // 把空缓冲区交还给驱动，让驱动采到下一帧时可以往这里填数据。
         ret = ioctl(fd , VIDIOC_QBUF, &buf);
         if (ret < 0) {
             LOG("VIDIOC_QBUF (%d) failed (%d)", i, ret);
@@ -130,7 +155,8 @@ int V4l2::init_video(const char *dev_name,int width,int height)
         }
     }
 
-    // Stream On
+    // STREAMON:
+    // 通知驱动开始正式采集。只有执行到这里，摄像头才会持续把帧写入上面的环形缓冲区。
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     ret = ioctl(fd, VIDIOC_STREAMON, &type);
     if (ret < 0)
@@ -141,6 +167,18 @@ int V4l2::init_video(const char *dev_name,int width,int height)
     return 0;
 }
 
+/**
+ * 从驱动队列里取出一帧最新数据。
+ *
+ * 处理顺序是：
+ * 1. select 等待设备可读，避免忙轮询；
+ * 2. DQBUF 取出一帧已经采好的驱动缓冲区；
+ * 3. 把数据地址和长度交给上层；
+ * 4. 立刻 QBUF 回去，让缓冲区重新进入驱动可写队列。
+ *
+ * @param frame_buf 输出参数，承接当前帧地址和字节数。
+ * @return          0 成功；非 0 表示等待或缓冲区出队/入队失败。
+ */
 int V4l2::get_data(FrameBuf *frame_buf)//读取数据到buf
 {
     int ret;
@@ -153,7 +191,8 @@ int V4l2::get_data(FrameBuf *frame_buf)//读取数据到buf
     FD_ZERO(&fds);
     FD_SET(fd, &fds);
 
-    /* Timeout. */
+    // select 超时时间。
+    // 如果摄像头长时间没有出帧，调用方会把它视为异常并重连设备。
     tv.tv_sec = 5;
     tv.tv_usec = 0;
 
@@ -169,22 +208,22 @@ int V4l2::get_data(FrameBuf *frame_buf)//读取数据到buf
         LOG("select timeout");
         return -1;
     }
-
-    
-
-    // Get frame
-    // 捕获数据
+    // DQBUF:
+    // 从驱动“已采集完成”的队列里取出一个缓冲区。
     ret = ioctl(fd, VIDIOC_DQBUF, &buf);
     if (ret < 0) {
         LOG("VIDIOC_DQBUF failed (%d)", ret);
         return ret;
     }
 
+    // buf.index 对应的是本次被取出的那个 mmap 缓冲区。
+    // bytesused 是这帧真正写入的字节数，对于 MJPEG 会小于映射总长度。
     frame_buf->start = mmap_buffer[buf.index].start;
     frame_buf->length = buf.bytesused;
 
-    // Re-queen buffer
-    // 将处理完毕的视频帧重新放回驱动程序的队列中，以供下一次捕获
+    // QBUF:
+    // 上层发布 ROS 消息时会自己做一次拷贝，所以这里只把驱动缓冲区尽快归还。
+    // 这样下一帧就不会因为“用户态迟迟不归还缓冲区”而卡住。
     ret = ioctl(fd, VIDIOC_QBUF, &buf);
     if (ret < 0) {
         LOG("VIDIOC_QBUF failed (%d)", ret);
@@ -194,13 +233,16 @@ int V4l2::get_data(FrameBuf *frame_buf)//读取数据到buf
     return 0;
 }
 
+/**
+ * 释放 V4L2 采集阶段占用的资源。
+ */
 void V4l2::release_video()
 {
-    // Release the resource
+    // 解除每个驱动缓冲区在用户态的映射。
     for (int i=0; i<BUFFER_COUNT; i++) {
         munmap(mmap_buffer[i].start, mmap_buffer[i].length);
     }
+    // 关闭设备文件描述符，采集生命周期结束。
     close(fd);
     LOG("Camera release done.");
 }
-

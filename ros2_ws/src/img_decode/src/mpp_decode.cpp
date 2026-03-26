@@ -6,6 +6,10 @@ MppDecode::MppDecode()
 {
 }
 
+/**
+ * @param width  输入图像宽度。
+ * @param height 输入图像高度。
+ */
 void MppDecode::init(int width,int height)
 {
 	int ret = init_mpp();
@@ -25,7 +29,8 @@ void MppDecode::init(int width,int height)
 
 MppDecode::~MppDecode()
 {
-	if (packet) 
+	// 释放顺序与 ROS1 版本保持一致：先对象，再 buffer，再 group，再 context。
+	if (packet)
 	{
         mpp_packet_deinit(&packet);
         packet = NULL;
@@ -68,6 +73,9 @@ MppDecode::~MppDecode()
 }
 
 
+/**
+ * 初始化 MPP 上下文，并固定成 MJPEG -> RGB888 解码器。
+ */
 int MppDecode::init_mpp()
 {
 	MPP_RET ret = MPP_OK;
@@ -97,7 +105,7 @@ int MppDecode::init_mpp()
         return ret;
     }
 
-	//设置MPP为解码模式 
+	// 设置成 MJPEG 解码模式。
 	//MPP_CTX_DEC ： 解码
 	//MPP_VIDEO_CodingAVC ： H.264
 	//MPP_VIDEO_CodingHEVC :  H.265
@@ -109,7 +117,7 @@ int MppDecode::init_mpp()
         return ret;
 	}
 
-	//实测此处可以是RGB，但不能是BGR，BGR解码输出不对
+	// 输出格式选 RGB888，方便直接交给 RGA 缩放。
 	MppFrameFormat frmType = MPP_FMT_RGB888; //MPP_FMT_RGB888; //MPP_FMT_YUV420P;
 	param = &frmType;
 	mpi->control(ctx, MPP_DEC_SET_OUTPUT_FORMAT, param);
@@ -118,6 +126,13 @@ int MppDecode::init_mpp()
 }
 
 
+/**
+ * 为 packet 和输出 frame 分配底层 buffer。
+ *
+ * @param width  输入图像宽度。
+ * @param height 输入图像高度。
+ * @return       0 成功；-1 失败。
+ */
 int MppDecode::init_packet_and_frame(int width, int height)
 {
 	RK_U32 hor_stride = MPP_ALIGN(width, 16);
@@ -164,12 +179,19 @@ int MppDecode::init_packet_and_frame(int width, int height)
 }
 
 
+/**
+ * @param srcFrm JPEG 数据首地址。
+ * @param srcLen JPEG 数据长度。
+ * @param image  输出 RGB 图像。
+ * @return       0 成功；非 0 失败。
+ */
 int MppDecode::decode(unsigned char *srcFrm, size_t srcLen, cv::Mat &image)
 {
 	MppTask task = NULL;
 	int ret;
 
 	//int pktEos = 0;
+	// 先把输入 JPEG 拷贝到 MPP 输入 packet buffer。
 	memcpy(dataBuf, srcFrm, srcLen);//拷贝到mpp_buffer
 
 	mpp_packet_set_pos(packet, dataBuf);
@@ -226,7 +248,7 @@ int MppDecode::decode(unsigned char *srcFrm, size_t srcLen, cv::Mat &image)
 		MppFrame frameOut = NULL;
 		mpp_task_meta_get_frame(task, KEY_OUTPUT_FRAME, &frameOut);
 
-		if (frame) 
+		if (frame)
 		{
 			image_res = get_image(frame,image);
 
@@ -257,6 +279,13 @@ int MppDecode::decode(unsigned char *srcFrm, size_t srcLen, cv::Mat &image)
 }
 
 
+/**
+ * 把 MPP 输出 frame 包装为 OpenCV Mat。
+ *
+ * @param frame MPP 输出 frame。
+ * @param image 输出 Mat。
+ * @return      0 成功；-1 失败。
+ */
 int MppDecode::get_image(MppFrame &frame,cv::Mat &image)
 {
     RK_U32 width    = 0;
@@ -288,6 +317,8 @@ int MppDecode::get_image(MppFrame &frame,cv::Mat &image)
         return -1;
 	}
 
+    // 这块内存通常不适合立刻用 CPU 大 memcpy 复制，
+    // 更适合让后面的 RGA 直接继续处理。
     base = (RK_U8 *)mpp_buffer_get_ptr(buffer);//这里的base是不带cache的内存，如果用mmcpy到用户内存会很慢，后续必须通过rga拷贝或者缩放
     
 	if(height<=0 || width<=0 || base==NULL)
@@ -296,6 +327,7 @@ int MppDecode::get_image(MppFrame &frame,cv::Mat &image)
 		return -1;
 	}
 
+    // Mat 只是包裹已有 buffer，不发生额外像素拷贝。
     image = cv::Mat(height, width, CV_8UC3, base);
 
 	//printf("%dx%d %dx%d %d %d\n",width,height,h_stride,v_stride,fmt,base);

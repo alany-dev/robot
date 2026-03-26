@@ -46,12 +46,32 @@ using namespace std;
 #define MPP_DBG(format, ...) (printf( ESC_START COLOR_GREEN "[MPP DBG]-[%s]-[%05d]:" format ESC_END, __FUNCTION__, (int)__LINE__, ##__VA_ARGS__))
 #define MPP_ERR(format, ...) (printf( ESC_START COLOR_RED   "[MPP ERR]-[%s]-[%05d]:" format ESC_END, __FUNCTION__, (int)__LINE__, ##__VA_ARGS__))
 
+/**
+ * ROS2 版 Rockchip MPP MJPEG 解码封装。
+ *
+ * 作用和 ROS1 版相同：
+ * - 把 JPEG 字节流送入 MPP；
+ * - 直接得到 RGB888 输出；
+ * - 让上层继续交给 RGA 缩放。
+ */
 class MppDecode
 {
 public:
 	MppDecode();
 	~MppDecode();
+
+	/**
+	 * @param width  输入图像宽度。
+	 * @param height 输入图像高度。
+	 */
 	void init(int width,int height);
+
+	/**
+	 * @param srcFrm JPEG 数据首地址。
+	 * @param srcLen JPEG 数据长度。
+	 * @param image  输出 RGB 图像，成功时引用 MPP buffer。
+	 * @return       0 成功；非 0 失败。
+	 */
 	int decode(unsigned char *srcFrm, size_t srcLen, cv::Mat &image);
 
 private:

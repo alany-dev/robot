@@ -16,6 +16,11 @@ using namespace std;
 
 int main(int argc, char** argv)
 {
+    // ROS2 低时延实验链路：
+    // 1. 采集端仍然直接输出 MJPEG；
+    // 2. 发布端使用 QoS(depth=1, best_effort, volatile)，尽量避免旧消息积压；
+    // 3. 无订阅者时不采集，进一步降低空转成本。
+
     // 摄像头使能标志（通过订阅 /enable_camera 话题控制）
     int enable_camera = 1;  // 默认使能摄像头
 
@@ -32,11 +37,16 @@ int main(int argc, char** argv)
     string pub_image_topic,dev_name,frame_id;
     int width,height,div;
 
+    // pub_image_topic: 压缩图像输出话题。
     node->declare_parameter("pub_image_topic", "/image_raw/compressed");
+    // dev_name: 首选摄像头设备路径。
     node->declare_parameter("dev_name", "/dev/video0");
+    // frame_id: 发布到消息头里的坐标系名称。
     node->declare_parameter("frame_id", "camera_link");
+    // width / height: 期望采集分辨率。
     node->declare_parameter("width", 1280);
     node->declare_parameter("height", 720);
+    // div: 分频发布参数。
     node->declare_parameter("div", 1);
 
     node->get_parameter("pub_image_topic", pub_image_topic);
@@ -48,6 +58,7 @@ int main(int argc, char** argv)
 
     //cv::Mat img(height, width, CV_8UC3);
 
+    // 允许业务运行时关闭摄像头采集。
     auto enable_camera_sub = node->create_subscription<std_msgs::msg::Bool>(
         "/enable_camera", 10, 
         [&enable_camera, node](const std_msgs::msg::Bool::SharedPtr msg) {
@@ -63,7 +74,10 @@ int main(int argc, char** argv)
             }
         });
 
-    // 优化 QoS 设置：历史深度=1，只保留最新消息，避免旧数据堆积
+    // QoS 选择是 ROS2 低时延实验链路的关键：
+    // - depth=1:       只保留最新一帧；
+    // - best_effort:   优先实时性，不为重传等待；
+    // - volatile:      不保留历史样本给后加入的订阅者。
     rclcpp::QoS qos_profile(1);
     qos_profile.best_effort(); 
     qos_profile.durability_volatile();
@@ -84,6 +98,7 @@ int main(int argc, char** argv)
 
     while(rclcpp::ok())
     {
+        // 无人消费时，不采集也不发布。
         if(pub->get_subscription_count()==0 || enable_camera==0)//检查订阅者数目，如果为0，则不采集图像
         {
             rclcpp::spin_some(node);
@@ -99,7 +114,7 @@ int main(int argc, char** argv)
             rclcpp::spin_some(node);
             sleep(1);
 
-            //切换视频设备尝试
+            // 当前设备失败时轮询尝试其它 video 设备。
             video_index++;
             if(video_index>=4)
                 video_index = 0;
@@ -156,6 +171,7 @@ int main(int argc, char** argv)
             //imshow("img", img);
             //waitKey(1);
 
+            // 发布出口统一打时间戳，作为 ROS2 链路统计时延的基准。
             msg.header.stamp = node->now();
             msg.header.frame_id = frame_id; 
             msg.format = "jpeg";

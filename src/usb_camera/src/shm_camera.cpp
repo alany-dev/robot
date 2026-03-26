@@ -15,6 +15,11 @@
 
 using namespace std;
 
+// shm_camera 是 usb_camera 的共享内存版本：
+// - 采集层逻辑完全相同，仍然从 V4L2 读取 MJPEG；
+// - 不同点在于发布阶段不直接把大消息走 ROS loopback socket，
+//   而是先写入共享内存，再通过 ROS 发一个 handle。
+
 int enable_camera=1;//默认使能摄像头
 
 //订阅回调函数
@@ -66,9 +71,11 @@ int main(int argc, char** argv)
 
     ros::Subscriber enable_camera_sub = nh.subscribe("/enable_camera", 10, enable_camera_callback);
 
-    // Use shared memory transport for better performance
+    // 共享内存发布器：
+    // pub_image_topic 仍然保持原来的逻辑 topic 名称，
+    // 但实际大消息会先写到共享内存，再通过 ROS topic 发送 handle。
     shm_transport::Topic shm_topic(nh);
-    // Allocate 10MB shared memory for compressed images (should be enough for 1280x720 JPEG)
+    // 这里给压缩 MJPEG 预留 10MB 共享内存，足够承载 1280x720 单帧 JPEG。
     shm_transport::Publisher shm_pub = shm_topic.advertise<sensor_msgs::CompressedImage>(pub_image_topic, 1, 10 * 1024 * 1024);
 
     sensor_msgs::CompressedImage msg;
@@ -86,6 +93,7 @@ int main(int argc, char** argv)
 
     while(nh.ok())
     {
+        // 无人消费时，不做无意义采集。
         if(shm_pub.getNumSubscribers()==0 || enable_camera==0)//检查订阅者数目，如果为0，则不采集图像
         {
             ros::spinOnce();
@@ -101,7 +109,7 @@ int main(int argc, char** argv)
             ros::spinOnce();
             sleep(1);
 
-            //切换视频设备尝试
+            // 当前设备失败时轮询尝试其它 video 设备。
             video_index++;
             if(video_index>=4)
                 video_index = 0;
@@ -158,11 +166,13 @@ int main(int argc, char** argv)
             //imshow("img", img);
             //waitKey(1);
 
+            // header 仍然由采集出口统一打时间戳，后续可以与普通 ROS 版测试结果做对比。
             msg.header.stamp = ros::Time::now();
             msg.header.frame_id = frame_id;
             msg.format = "jpeg";
             msg.data.assign(frame_buf.start, frame_buf.start+frame_buf.length);
 
+            // 发布时大消息写入共享内存，ROS 网络里只发送 handle。
             shm_pub.publish(msg); //发布压缩图像
 
             ros::spinOnce();
@@ -170,4 +180,3 @@ int main(int argc, char** argv)
         }
     }
 }
-
