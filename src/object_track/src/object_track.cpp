@@ -586,11 +586,13 @@ int main(int argc, char** argv)
     message_filters::Subscriber<sensor_msgs::Image> image_sub(object_track.nh, object_track.sub_image_topic, 1);
     message_filters::Subscriber<ai_msgs::Dets> det_sub(object_track.nh,  object_track.sub_det_topic, 1);
 
-    // 用 ExactTime 的原因：
+    // 用 ExactTime 精确时间同步策略 的原因：
     // rknn_yolov6 在发布 image_det 和 ai_msg_det 时复用了同一个 header，
     // 因此这里不需要 ApproximateTime，直接精确同步即可。
     typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, ai_msgs::Dets> SyncPolicy;
+    // Synchronizer<SyncPolicy> 同步器本体，SyncPolicy(10) 队列大小为 10
     message_filters::Synchronizer<SyncPolicy> sync(SyncPolicy(10), image_sub, det_sub);
+    // registerCallback 同步器成功匹配互，调用 sync_callback
     sync.registerCallback(boost::bind(&ObjectTrack::sync_callback,&object_track, _1, _2));
 
     // 默认先不订阅上游，等有人真的订阅 /camera/image_det_track 再开启。

@@ -207,9 +207,10 @@ int MppDecode::decode(unsigned char *srcFrm, size_t srcLen, cv::Mat &image)
 	int ret;
 
 	//int pktEos = 0;
-	// 先把 JPEG 数据拷贝到 MPP 管理的 packet buffer。
+	// 1 先把 JPEG 数据拷贝到 MPP 管理的 packet buffer。
 	memcpy(dataBuf, srcFrm, srcLen);//拷贝到mpp_buffer
 
+	// 2 当前帧的压缩数据 数值添加到 packet
 	mpp_packet_set_pos(packet, dataBuf);
     mpp_packet_set_length(packet, srcLen);
 
@@ -219,7 +220,7 @@ int MppDecode::decode(unsigned char *srcFrm, size_t srcLen, cv::Mat &image)
 	// }
 
 	// 输入端 poll / dequeue / enqueue：
-	// 相当于告诉 MPP “这里有一帧新的 JPEG，请开始解码”。
+	// 3 等待 MMP 输入输出可用
 	ret = mpi->poll(ctx, MPP_PORT_INPUT, MPP_POLL_BLOCK);
     if (ret) 
 	{
@@ -227,6 +228,7 @@ int MppDecode::decode(unsigned char *srcFrm, size_t srcLen, cv::Mat &image)
         return ret;
     }
 
+	// 4 从输入队列里拿到一个可填写的任务对象 task
 	ret = mpi->dequeue(ctx, MPP_PORT_INPUT, &task);  /* input queue */
     if (ret) 
 	{
@@ -234,9 +236,12 @@ int MppDecode::decode(unsigned char *srcFrm, size_t srcLen, cv::Mat &image)
         return ret;
     }
 
+	// 5 JPEG输入包 packet 添加到 task
 	mpp_task_meta_set_packet(task, KEY_INPUT_PACKET, packet);
     mpp_task_meta_set_frame (task, KEY_OUTPUT_FRAME,  frame);
 
+
+	// 6 输入任务提交给 MPP 解码器
 	ret = mpi->enqueue(ctx, MPP_PORT_INPUT, task);  /* input queue */
     if (ret) 
 	{
@@ -245,7 +250,7 @@ int MppDecode::decode(unsigned char *srcFrm, size_t srcLen, cv::Mat &image)
     }
 
 	// 输出端 poll / dequeue：
-	// 等待解码器把这一帧的 RGB 结果准备好。
+	// 7 等待输出端口有结果可取
     ret = mpi->poll(ctx, MPP_PORT_OUTPUT, MPP_POLL_BLOCK);
     if (ret) 
 	{
@@ -253,6 +258,7 @@ int MppDecode::decode(unsigned char *srcFrm, size_t srcLen, cv::Mat &image)
         return ret;
     }
 
+	// 8 从输出队列取回这个已经完成的任务
 	ret = mpi->dequeue(ctx, MPP_PORT_OUTPUT, &task); /* output queue */
     if (ret) 
 	{
@@ -264,6 +270,7 @@ int MppDecode::decode(unsigned char *srcFrm, size_t srcLen, cv::Mat &image)
 
 	if (task)
 	{
+		// 9 从已完成任务里拿到输出帧句柄
 		MppFrame frameOut = NULL;
 		mpp_task_meta_get_frame(task, KEY_OUTPUT_FRAME, &frameOut);
 
@@ -271,6 +278,7 @@ int MppDecode::decode(unsigned char *srcFrm, size_t srcLen, cv::Mat &image)
 		// 但当前实现里 frame 对象本身已经绑定了输出 buffer，直接继续取图即可。
 		if (frame)
 		{
+			// 10 MMP 输出 buffer 包装成 cv::Mat 返回给上层
 			image_res = get_image(frame,image);
 
             // if (mpp_frame_get_eos(frameOut))
@@ -283,7 +291,7 @@ int MppDecode::decode(unsigned char *srcFrm, size_t srcLen, cv::Mat &image)
 			image_res = -1;
 		}
 
-		// 把 task 放回输出队列，完成一次完整的 MPP 任务生命周期。
+		// 11 把 task 放回输出队列，完成一次完整的 MPP 任务生命周期。
 		ret = mpi->enqueue(ctx, MPP_PORT_OUTPUT, task);
         if (ret)
         {

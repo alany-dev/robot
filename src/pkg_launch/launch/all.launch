@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <launch>
     <!-- <include file="$(find base_control)/launch/base_control.launch"/> -->
+    <!-- include 加载其他的 launch -->
     <include file="$(find pkg_launch)/launch/urdf.launch"/>
 
     <include file="$(find usb_camera)/launch/usb_camera.launch"/>

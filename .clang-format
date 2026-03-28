@@ -4,6 +4,7 @@ BasedOnStyle: Google
 Language:                               Cpp
 Cpp11BracedListStyle:                   true
 Standard:                               Cpp11
+IndentWidth: 4 
 CommentPragmas:                         '^ NOLINT'
 # Mimic cpplint style
 IncludeCategories:
