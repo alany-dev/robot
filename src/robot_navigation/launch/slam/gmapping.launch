@@ -1,51 +1,65 @@
 <?xml version="1.0"?>
 <launch>
-  <arg name="set_base_frame" default="base_footprint"/>
-  <arg name="set_odom_frame" default="odom"/>
-  <arg name="set_map_frame"  default="map"/>
-  <arg name="scan_topic" default="scan" />
+  <!-- 坐标系与话题参数 -->
+  <arg name="set_base_frame" default="base_footprint"/> <!-- 机器人基座坐标系（通常为机器人底部中心） -->
+  <arg name="set_odom_frame" default="odom"/> <!-- 里程计坐标系（记录机器人相对起始点的运动） -->
+  <arg name="set_map_frame"  default="map"/> <!-- 地图坐标系（固定的世界坐标系） -->
+  <arg name="scan_topic" default="scan" /> <!-- 激光扫描数据的话题名称，可通过参数动态修改 -->
   
   
-  <!-- Gmapping -->
+  <!-- Gmapping SLAM 节点 -->
   <node pkg="gmapping" type="slam_gmapping" name="gmapping" output="screen">
-    <param name="base_frame" value="$(arg set_base_frame)"/>
-    <param name="odom_frame" value="$(arg set_odom_frame)"/>
-    <param name="map_frame"  value="$(arg set_map_frame)"/>
+    <!-- 坐标系配置 -->
+    <param name="base_frame" value="$(arg set_base_frame)"/> <!-- 机器人基座坐标系，与上方arg参数关联 -->
+    <param name="odom_frame" value="$(arg set_odom_frame)"/> <!-- 里程计坐标系，与上方arg参数关联 -->
+    <param name="map_frame"  value="$(arg set_map_frame)"/> <!-- 地图坐标系，与上方arg参数关联 -->
     
-    <param name="map_update_interval" value="5.0"/> <!--地图更新之间的时间长度（以秒为单位）。降低此数字会更频繁地更新占用网格，但代价是计算负载更大-->
-    <param name="maxUrange" value="5.0"/> <!-- 5米 激光器的最大可用范围，将裁剪为此值-->
+    <!-- 地图更新与激光配置 -->
+    <param name="map_update_interval" value="5.0"/> <!-- 地图更新间隔（秒），值越小更新越频繁，但计算负载越高 -->
+    <param name="maxUrange" value="5.0"/> <!-- 激光雷达最大可用测距范围（米），超过此范围的数据会被裁剪 -->
     
-    <param name="sigma" value="0.05"/>
-    <param name="kernelSize" value="1"/>
-    <param name="lstep" value="0.05"/>
-    <param name="astep" value="0.05"/>
-    <param name="iterations" value="5"/>
-    <param name="lsigma" value="0.075"/>
-    <param name="ogain" value="3.0"/>
-    <param name="lskip" value="0"/>
-    <param name="minimumScore" value="50"/>
-    <param name="srr" value="0.1"/>
-    <param name="srt" value="0.2"/>
-    <param name="str" value="0.1"/>
-    <param name="stt" value="0.2"/>
-    <param name="linearUpdate" value="1.0"/> 
-    <param name="angularUpdate" value="0.2"/> <!--default:0.5-->
-    <param name="temporalUpdate" value="0.5"/> <!--default:-1.0-->
-    <param name="resampleThreshold" value="0.5"/>
-    <param name="particles" value="100"/> <!--default:30-->
+    <!-- 扫描匹配参数（核心算法参数） -->
+    <param name="sigma" value="0.05"/> <!-- 扫描匹配的标准差，控制匹配平滑度，越小越精确但对噪声越敏感 -->
+    <param name="kernelSize" value="1"/> <!-- 扫描匹配的内核大小，影响匹配搜索范围 -->
+    <param name="lstep" value="0.05"/> <!-- 平移搜索步长（米），用于扫描匹配时的平移方向探索 -->
+    <param name="astep" value="0.05"/> <!-- 角度搜索步长（弧度），用于扫描匹配时的旋转方向探索 -->
+    <param name="iterations" value="5"/> <!-- 扫描匹配迭代次数，次数越多匹配越精确但耗时越长 -->
+    <param name="lsigma" value="0.075"/> <!-- 似然函数标准差，用于计算激光扫描数据的似然概率 -->
+    <param name="ogain" value="3.0"/> <!-- 似然函数增益，调整似然概率在扫描匹配中的权重 -->
+    <param name="lskip" value="0"/> <!-- 跳过的激光扫描线数量，0表示使用所有扫描线（减少计算量可设为>0，但会损失精度） -->
+    <param name="minimumScore" value="50"/> <!-- 扫描匹配最小得分，低于此值认为匹配失败（需检查激光数据或参数） -->
     
-    <param name="xmin" value="-5.0"/> <!--初始地图大小-->
-    <param name="ymin" value="-5.0"/>
-    <param name="xmax" value="5.0"/>
-    <param name="ymax" value="5.0"/>
-    <param name="delta" value="0.02"/> <!--地图分辨率（以米为单位，每个占用网格块）default: 0.05 = 5cm-->
+    <!-- 运动模型噪声参数（用于粒子滤波预测） -->
+    <param name="srr" value="0.1"/> <!-- 平移分量导致的平移误差（米/米）：机器人每移动1米，平移方向的误差 -->
+    <param name="srt" value="0.2"/> <!-- 平移分量导致的旋转误差（弧度/米）：机器人每移动1米，旋转方向的误差 -->
+    <param name="str" value="0.1"/> <!-- 旋转分量导致的平移误差（米/弧度）：机器人每旋转1弧度，平移方向的误差 -->
+    <param name="stt" value="0.2"/> <!-- 旋转分量导致的旋转误差（弧度/弧度）：机器人每旋转1弧度，旋转方向的误差 -->
     
-    <param name="llsamplerange" value="0.01"/>
-    <param name="llsamplestep" value="0.01"/>
-    <param name="lasamplerange" value="0.005"/>
-    <param name="lasamplestep" value="0.005"/>
+    <!-- 地图更新触发条件 -->
+    <param name="linearUpdate" value="1.0"/> <!-- 机器人平移超过此距离（米）时，触发地图更新 -->
+    <param name="angularUpdate" value="0.2"/> <!-- 机器人旋转超过此角度（弧度）时，触发地图更新（默认0.5，调小可更频繁更新） -->
+    <param name="temporalUpdate" value="0.5"/> <!-- 时间更新间隔（秒），即使无运动，超过此时间也更新地图（默认-1.0表示禁用） -->
     
-    <remap from="scan" to="$(arg scan_topic)"/>
+    <!-- 粒子滤波参数 -->
+    <param name="resampleThreshold" value="0.5"/> <!-- 重采样阈值，粒子有效样本数低于此比例时触发重采样（避免粒子退化） -->
+    <param name="particles" value="100"/> <!-- 粒子数量，默认30，数量越多定位精度越高但计算量越大 -->
+    
+    <!-- 初始地图范围与分辨率 -->
+    <param name="xmin" value="-5.0"/> <!-- 初始地图x轴最小值（米），定义初始地图的左边界 -->
+    <param name="ymin" value="-5.0"/> <!-- 初始地图y轴最小值（米），定义初始地图的下边界 -->
+    <param name="xmax" value="5.0"/> <!-- 初始地图x轴最大值（米），定义初始地图的右边界 -->
+    <param name="ymax" value="5.0"/> <!-- 初始地图y轴最大值（米），定义初始地图的上边界 -->
+    <param name="delta" value="0.02"/> <!-- 地图分辨率（米/栅格），即每个栅格代表的实际距离（默认0.05=5cm，此处0.02=2cm，精度更高但内存占用更大） -->
+    
+    <!-- 局部地图采样参数（用于精细扫描匹配） -->
+    <param name="llsamplerange" value="0.01"/> <!-- 局部地图采样的平移范围（米），用于扫描匹配时的局部搜索 -->
+    <param name="llsamplestep" value="0.01"/> <!-- 局部地图采样的平移步长（米） -->
+    <param name="lasamplerange" value="0.005"/> <!-- 局部地图采样的角度范围（弧度） -->
+    <param name="lasamplestep" value="0.005"/> <!-- 局部地图采样的角度步长（弧度） -->
+    
+    <!-- 话题重映射 -->
+    <!-- 将节点默认订阅的 "scan" 话题，重映射为参数指定的话题名（如 "scan_front"） -->
+    <remap from="scan" to="$(arg scan_topic)"/> <!-- 将节点默认的"scan"话题重映射为用户指定的话题名称 -->
   </node>
 </launch> 
 

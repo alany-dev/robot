@@ -1,6 +1,21 @@
 1.项目描述:
 设计并实现了一套完整基于RK芯片-低时延ROS-大模型Agent-端到端机器人系统，涵盖ROS-高带宽数据-共享内存低时延通信优化，低时延端侧大模型Agent 离线/在线双版本交互(离线版:ASR->Qwen3-0.6B微调-量化部署->FunctionCall指令遵循->TTS全流式链路;在线版:Qwen全家桶ASR->qwen-plus记忆推理->Function Call指令遵循->TTS全流式响应)、完整的低时延相机视觉处理全链路(V4L2相机驱动数据采集>RK-MPP/RGA硬件加速优化数据处理->多线程NPU推理加速YOLO模型目标检测->多传感器融合实现目标跟踪)、底盘运动控制、建图导航、STM32-MCU固件开发、工业化部署(自启动、Docker容器化部署)、端侧系统性能监控等核心模块。系统采用模块化架构，支持ROS1/ROS2通信切换，实现了高性能、低延迟的实时通信与数据处理能力。
 
+2.推荐先看这些文档:
+
+- `project_deployment_manual.md`
+  偏部署与启动入口，适合首次上板和首次进容器。
+- `board_docker_deployment.md`
+  偏板端 Docker 构建、运行和进入容器。
+- `container_zero_to_done_manual.md`
+  偏“部署完成后怎么一步一步调试到整机跑通”。
+- `note/01_低时延相机视觉链路.md`
+  偏视觉低时延实现思路。
+- `note/03_Agent系统全景分析报告.md`
+  偏 Agent 结构和运行链路。
+- `note/05_跟踪算法节点全景分析报告.md`
+  偏 `object_track` 及其上下游链路。
+
 1.1功能概述
 1.ROS-高带宽数据-共享内存低时延通信优化
 2.ROS1/ROS2通信切换，ROS1VSROS2机器人时延性能分析

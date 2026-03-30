@@ -14,6 +14,7 @@ src/agent/memory.json
 
 # 日志文件
 *.log
+logs/
 
 # IDE
 .vscode/
@@ -35,6 +36,9 @@ install/
 
 !docker/build
 !docker/build/install
+docker/build/vendor/rk/
+docker/build/vendor/rk_manifest.txt
+docker/build/install/ydlidar-sdk/YDLidar-SDK/
 
 offline-agent/llamacpp-ros/models/Qwen3-0.6B-BF16.gguf
 offline-agent/install

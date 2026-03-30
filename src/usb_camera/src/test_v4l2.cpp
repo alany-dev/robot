@@ -45,7 +45,7 @@ int main(int argc, char** argv)
 
     // 初始化摄像头
     cout << "\n正在初始化摄像头..." << endl;
-    int ret = v4l2.init_video(dev_name, width, height);
+    int ret = v4l2.init_video(dev_name, width, height, CaptureFormat::kMjpeg, 30);
     if (ret < 0)
     {
         cerr << "摄像头初始化失败！错误码: " << ret << endl;

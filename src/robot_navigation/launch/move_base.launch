@@ -8,39 +8,47 @@
   <!-- move_base use DWA planner-->
   <group if="$(eval planner == 'dwa')">
     <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
-    <!-- use global_planner replace default navfn as global planner ,global_planner support A* and dijkstra algorithm-->
-    <param name="base_global_planner" value="global_planner/GlobalPlanner"/>
-    <param name="base_local_planner" value="dwa_local_planner/DWAPlannerROS" />
-    <!-- <rosparam file="$(find robot_navigation)/param/NanoRobot/global_planner_params.yaml" command="load" /> -->
-    <rosparam file="$(find robot_navigation)/config/robot/costmap_common_params.yaml" command="load" ns="global_costmap" />
-    <rosparam file="$(find robot_navigation)/config/robot/costmap_common_params.yaml" command="load" ns="local_costmap" />
-    <rosparam file="$(find robot_navigation)/config/robot/local_costmap_params.yaml" command="load" />
-    <rosparam file="$(find robot_navigation)/config/robot/global_costmap_params.yaml" command="load" />
-    <rosparam file="$(find robot_navigation)/config/robot/move_base_params.yaml" command="load" />
-    <rosparam file="$(find robot_navigation)/config/robot/dwa_local_planner_params.yaml" command="load" />
-    <param name="DWAPlannerROS/min_vel_x" value="0.0" if="$(arg move_forward_only)" />
-    <!--default is True,use dijkstra algorithm;set to False,usd A* algorithm-->
-    <!--<param name="GlobalPlanner/use_dijkstra " value="$(arg use_dijkstra)" />-->
-  </node>
+      <!-- use global_planner replace default navfn as global planner ,global_planner support A* and dijkstra algorithm-->
+      <!-- Navfn 老，global_planner。这里使用默认的 dijkstra，得到的路径曲线更优，更平滑-->
+      <!-- Carrot_planner 更简单的规划器，直线规划。-->
+      <param name="base_global_planner" value="global_planner/GlobalPlanner"/>
+      <!--  -->
+      <param name="base_local_planner" value="dwa_local_planner/DWAPlannerROS" />
+      <!-- <rosparam file="$(find robot_navigation)/param/NanoRobot/global_planner_params.yaml" command="load" /> -->
+      <!-- ns类似于namespace，直接把 global_costmap添加到 参数yaml的开头，复用同一份参数文件 -->
+      <!-- common 通用形状 -->
+      <rosparam file="$(find robot_navigation)/config/robot/costmap_common_params.yaml" command="load" ns="global_costmap" />
+      <rosparam file="$(find robot_navigation)/config/robot/costmap_common_params.yaml" command="load" ns="local_costmap" />
+      <!-- 局部代价器 频率-->
+      <rosparam file="$(find robot_navigation)/config/robot/local_costmap_params.yaml" command="load" />
+      <!-- 全局代价器 频率-->
+      <rosparam file="$(find robot_navigation)/config/robot/global_costmap_params.yaml" command="load" />
+      <rosparam file="$(find robot_navigation)/config/robot/move_base_params.yaml" command="load" />
+      <!-- dwa_local_planner 局部规划器配置文件 -->
+      <rosparam file="$(find robot_navigation)/config/robot/dwa_local_planner_params.yaml" command="load" />
+      <param name="DWAPlannerROS/min_vel_x" value="0.0" if="$(arg move_forward_only)" />
+      <!--default is True,use dijkstra algorithm;set to False,usd A* algorithm-->
+      <!--<param name="GlobalPlanner/use_dijkstra " value="$(arg use_dijkstra)" />-->
+    </node>
 
   </group>
   <!-- move_base use TEB planner-->
   <group if="$(eval planner == 'teb')">
     <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
-    <!-- use global_planner replace default navfn as global planner ,global_planner support A* and dijkstra algorithm-->
-    <param name="base_global_planner" value="global_planner/GlobalPlanner"/>
-    <param name="base_local_planner" value="teb_local_planner/TebLocalPlannerROS" />
-    <!-- <rosparam file="$(find robot_navigation)/param/NanoRobot/global_planner_params.yaml" command="load" /> -->
-    <rosparam file="$(find robot_navigation)/config/robot/costmap_common_params.yaml" command="load" ns="global_costmap" />
-    <rosparam file="$(find robot_navigation)/config/robot/costmap_common_params.yaml" command="load" ns="local_costmap" />
-    <rosparam file="$(find robot_navigation)/config/robot/local_costmap_params.yaml" command="load" />
-    <rosparam file="$(find robot_navigation)/config/robot/global_costmap_params.yaml" command="load" />
-    <rosparam file="$(find robot_navigation)/config/robot/move_base_params.yaml" command="load" />
-    <rosparam file="$(find robot_navigation)/config/robot/teb_local_planner_params.yaml" command="load" />
-    <param name="TebLocalPlannerROS/max_vel_x_backwards" value="0.0" if="$(arg move_forward_only)" />
-    <!--default is True,use dijkstra algorithm;set to False,usd A* algorithm-->
-    <!--<param name="GlobalPlanner/use_dijkstra " value="$(arg use_dijkstra)" />-->
-  </node>
+      <!-- use global_planner replace default navfn as global planner ,global_planner support A* and dijkstra algorithm-->
+      <param name="base_global_planner" value="global_planner/GlobalPlanner"/>
+      <param name="base_local_planner" value="teb_local_planner/TebLocalPlannerROS" />
+      <!-- <rosparam file="$(find robot_navigation)/param/NanoRobot/global_planner_params.yaml" command="load" /> -->
+      <rosparam file="$(find robot_navigation)/config/robot/costmap_common_params.yaml" command="load" ns="global_costmap" />
+      <rosparam file="$(find robot_navigation)/config/robot/costmap_common_params.yaml" command="load" ns="local_costmap" />
+      <rosparam file="$(find robot_navigation)/config/robot/local_costmap_params.yaml" command="load" />
+      <rosparam file="$(find robot_navigation)/config/robot/global_costmap_params.yaml" command="load" />
+      <rosparam file="$(find robot_navigation)/config/robot/move_base_params.yaml" command="load" />
+      <rosparam file="$(find robot_navigation)/config/robot/teb_local_planner_params.yaml" command="load" />
+      <param name="TebLocalPlannerROS/max_vel_x_backwards" value="0.0" if="$(arg move_forward_only)" />
+      <!--default is True,use dijkstra algorithm;set to False,usd A* algorithm-->
+      <!--<param name="GlobalPlanner/use_dijkstra " value="$(arg use_dijkstra)" />-->
+    </node>
   </group>
   
 </launch>

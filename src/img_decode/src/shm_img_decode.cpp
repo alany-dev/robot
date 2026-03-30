@@ -1,63 +1,103 @@
 #include "shm_img_decode.h"
+
+#include <algorithm>
+#include <cctype>
 #include <thread>
 
-// shm_img_decode 的目标是把“解码后的大 raw 图像”这一步从 ROS loopback socket
-// 切换到共享内存传输，从而观察 raw 图像跨进程通信时延的改善情况。
+namespace {
 
-ImgDecode::ImgDecode() : nh("~") 
+std::string normalize_input_format(const std::string &format_name) {
+    std::string format = format_name;
+    for (size_t i = 0; i < format.size(); ++i) {
+        format[i] = static_cast<char>(tolower(format[i]));
+    }
+
+    if (format == "jpeg" || format == "mjpeg" || format == "mjpg") {
+        return "mjpeg";
+    }
+    if (format == "yuyv" || format == "yuv" || format == "yuv422" ||
+        format == "yuy2" || format == "yuv422_yuy2") {
+        return "yuyv";
+    }
+    return "";
+}
+
+}  // namespace
+
+ImgDecode::ImgDecode() : nh("~")
 {
-    string pub_raw_image_topic,camera_info_topic;
-    string camera_name,camera_info_url;
-    int width,height;
+    string pub_raw_image_topic;
 
     nh.param<string>("sub_jpeg_image_topic", sub_jpeg_image_topic, "/image_raw/compressed");
+    nh.param<string>("sub_raw_image_topic", sub_raw_image_topic, "/image_raw/yuv");
     nh.param<string>("pub_raw_image_topic", pub_raw_image_topic, "/camera/image_raw");
     nh.param<int>("fps_div", fps_div, 1);
     nh.param<double>("scale", scale, 0.5);
-
     nh.param<int>("width", width, 1280);
     nh.param<int>("height", height, 720);
+    nh.param<string>("input_format", input_format, "mjpeg");
 
-    // 下游 raw 图像通过共享内存发布。
+    input_format = normalize_input_format(input_format);
+    if (input_format.empty()) {
+        input_format = "mjpeg";
+    }
+
     shm_transport::Topic shm_topic(nh);
-    shm_raw_image_pub = shm_topic.advertise<sensor_msgs::Image>(pub_raw_image_topic, 1, 300 * 1024 * 1024);
-    
+    shm_raw_image_pub = shm_topic.advertise<sensor_msgs::Image>(pub_raw_image_topic, 1,
+                                                                300 * 1024 * 1024);
+
     ROS_INFO("Using shared memory transport for image publishing");
 
 #if(USE_ARM_LIB==1)
-    mpp_decode.init(width,height);
+    if (input_format == "mjpeg") {
+        mpp_decode.init(width, height, "mjpeg");
+    }
 #endif
-
 }
 
 void ImgDecode::compressed_image_callback(const sensor_msgs::CompressedImageConstPtr& msg)
 {
-
     frame_cnt++;
-
-    // 和普通 img_decode 一样，先做分频，避免后续解码和缩放白跑。
-    if(frame_cnt%fps_div!=0)//分频 减少后续处理负担
+    if(frame_cnt % fps_div != 0)
     {
         return;
     }
 
-    
+    const std::string frame_format = normalize_input_format(msg->format);
+    if (frame_format != "mjpeg")
+    {
+        ROS_WARN_THROTTLE(2.0, "compressed input only supports mjpeg, got '%s'",
+                          msg->format.c_str());
+        return;
+    }
+
+    if (msg->data.empty())
+    {
+        ROS_WARN("compressed image data is empty");
+        return;
+    }
+
+    int src_width = 0;
+    int src_height = 0;
+
 #if(USE_ARM_LIB==1)
-    if(msg->data.size() <= 4096) //一般情况下，JPEG图像不能小于4KB
+    if (!mpp_decode.ensure_config(width, height, "mjpeg"))
     {
-        ROS_WARN("jpeg data size error! size = %d\n",msg->data.size());
+        ROS_WARN("mpp decode init failed for mjpeg");
         return;
     }
 
-    //硬解码JPEG->RGB
-    int ret = mpp_decode.decode((unsigned char*)msg->data.data(), msg->data.size(), image);//msg-->image
+    DecodedFrame decoded;
+    int ret = mpp_decode.decode((unsigned char*)msg->data.data(), msg->data.size(), decoded);
     if(ret < 0)
     {
-        ROS_WARN("jpeg decode error! size = %d\n",msg->data.size());
+        ROS_WARN("mjpeg decode error! size=%zu", msg->data.size());
         return;
     }
+
+    src_width = decoded.width;
+    src_height = decoded.height;
 #else
-    //软解码JPEG->BGR->RGB
     image = cv::imdecode(cv::Mat(msg->data), cv::IMREAD_COLOR);
     if (image.empty())
     {
@@ -65,30 +105,91 @@ void ImgDecode::compressed_image_callback(const sensor_msgs::CompressedImageCons
         return;
     }
     cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
+    src_width = image.cols;
+    src_height = image.rows;
 #endif
 
-    // 继续沿用采集节点的时间戳，便于和普通 ROS 版做同口径时延对比。
-    msg_pub.header = msg->header;//使用原有时间戳
-    msg_pub.height = image.rows * scale;
-    msg_pub.width =  image.cols * scale;
+    msg_pub.header = msg->header;
+    msg_pub.height = std::max(1, static_cast<int>(src_height * scale));
+    msg_pub.width = std::max(1, static_cast<int>(src_width * scale));
     msg_pub.encoding = "rgb8";
     msg_pub.step = msg_pub.width * 3;
     msg_pub.data.resize(msg_pub.height * msg_pub.width * 3);
 
-    //避免图像多次拷贝，直接将缩放后的数据写到msg_pub中
-
 #if(USE_ARM_LIB==1)
-    //硬缩放RGB->小RGB
-    rga_resize(image, msg_pub.data.data(), scale);//image-->msg_pub.data
+    int rga_ret = -1;
+    if (decoded.format == MPP_FMT_RGB888 && !decoded.image.empty())
+    {
+        image = decoded.image;
+        rga_ret = rga_resize(image, msg_pub.data.data(), scale);
+    }
+    else
+    {
+        ROS_WARN("Unsupported MPP output format=%d for mjpeg", decoded.format);
+        return;
+    }
+
+    if (rga_ret != 0)
+    {
+        ROS_WARN("rga mjpeg post-process failed, ret=%d", rga_ret);
+        return;
+    }
 #else
-    //软缩放RGB->小RGB
     cv::resize(image, image, cv::Size(), scale, scale);
     memcpy(msg_pub.data.data(), image.data, msg_pub.height * msg_pub.width * 3);
 #endif
-    
-    // 发布 raw 图像时走共享内存。
+
     shm_raw_image_pub.publish(msg_pub);
-        
+}
+
+void ImgDecode::raw_image_callback(const sensor_msgs::ImageConstPtr& msg)
+{
+    frame_cnt++;
+    if(frame_cnt % fps_div != 0)
+    {
+        return;
+    }
+
+    const std::string frame_format = normalize_input_format(msg->encoding);
+    if (frame_format != "yuyv")
+    {
+        ROS_WARN_THROTTLE(2.0, "raw input only supports yuyv, got '%s'", msg->encoding.c_str());
+        return;
+    }
+
+    if (msg->data.empty())
+    {
+        ROS_WARN("raw image data is empty");
+        return;
+    }
+
+    msg_pub.header = msg->header;
+    msg_pub.height = std::max(1, static_cast<int>(msg->height * scale));
+    msg_pub.width = std::max(1, static_cast<int>(msg->width * scale));
+    msg_pub.encoding = "rgb8";
+    msg_pub.step = msg_pub.width * 3;
+    msg_pub.data.resize(msg_pub.height * msg_pub.width * 3);
+
+#if(USE_ARM_LIB==1)
+    const int wstride = msg->step / 2;
+    const int rga_ret = rga_resize_yuyv422_to_rgb(const_cast<unsigned char*>(msg->data.data()),
+                                                  msg->width, msg->height, wstride, msg->height,
+                                                  msg_pub.data.data(), msg_pub.width,
+                                                  msg_pub.height);
+    if (rga_ret != 0)
+    {
+        ROS_WARN("rga yuyv post-process failed, ret=%d", rga_ret);
+        return;
+    }
+#else
+    cv::Mat yuyv(msg->height, msg->width, CV_8UC2,
+                 const_cast<unsigned char*>(msg->data.data()), msg->step);
+    cv::cvtColor(yuyv, image, cv::COLOR_YUV2RGB_YUY2);
+    cv::resize(image, image, cv::Size(msg_pub.width, msg_pub.height));
+    memcpy(msg_pub.data.data(), image.data, msg_pub.height * msg_pub.width * 3);
+#endif
+
+    shm_raw_image_pub.publish(msg_pub);
 }
 
 void ImgDecode::run_check_thread()
@@ -97,36 +198,38 @@ void ImgDecode::run_check_thread()
     while(ros::ok())
     {
         int subscribers = shm_raw_image_pub.getNumSubscribers();
-        // 无人消费共享内存 raw 图像时，直接停掉上游压缩图像订阅。
         if(subscribers==0 && last_subscribers>0)
         {
             ROS_INFO("decode image subscribers = 0, src sub shutdown");
             compressed_image_sub.shutdown();
+            raw_image_sub.shutdown();
         }
-        // 一旦有人订阅共享内存输出，再恢复上游订阅。
         else if(subscribers>0 && last_subscribers==0)
         {
-            ROS_INFO("decode image subscribers > 0, src sub start");
-            compressed_image_sub = nh.subscribe(sub_jpeg_image_topic, 10, &ImgDecode::compressed_image_callback,this);
+            ROS_INFO("decode image subscribers > 0, src sub start, input_format=%s",
+                     input_format.c_str());
+            if (input_format == "mjpeg") {
+                compressed_image_sub = nh.subscribe(sub_jpeg_image_topic, 10,
+                                                    &ImgDecode::compressed_image_callback, this);
+            } else if (input_format == "yuyv") {
+                raw_image_sub = nh.subscribe(sub_raw_image_topic, 10,
+                                             &ImgDecode::raw_image_callback, this);
+            } else {
+                ROS_WARN("unsupported input_format=%s", input_format.c_str());
+            }
         }
 
         last_subscribers = subscribers;
-
-        usleep(100*1000);//100ms
+        usleep(100 * 1000);
     }
 }
-
-
 
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "shm_img_decode");
 
     ImgDecode img_decode;
-
-    // 独立线程负责按需开关上游订阅。
     std::thread check_thread(&ImgDecode::run_check_thread, &img_decode);
-
     ros::spin();
 
     return 0;

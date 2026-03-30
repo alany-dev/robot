@@ -1,14 +1,14 @@
 local_costmap:
-  global_frame: odom
+  global_frame: odom # 以odom作为参考系，测出的障碍物位置不易跳变
   robot_base_frame: base_footprint
-
-  update_frequency: 10.0
+ 
+  update_frequency: 10.0  # 一般和激光雷达的扫描频率一致
   publish_frequency: 10.0
   transform_tolerance: 0.5  
 
-  static_map: false  
-  rolling_window: true
-  width: 3
+  static_map: false   # 不使用 全局地图，而是 当前扫描的局部地图
+  rolling_window: true  # 局部地图是否跟随机器人移动
+  width: 3  # 单位m
   height: 3
   resolution: 0.05
   

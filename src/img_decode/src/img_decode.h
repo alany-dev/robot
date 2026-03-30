@@ -5,6 +5,7 @@
 #include <opencv2/opencv.hpp>
 
 #include <iostream>
+#include <string>
 #include <sys/time.h>
 #include <math.h>
 
@@ -36,6 +37,7 @@ public:
 
     // 压缩图像订阅者：只有当下游有人订阅 raw 图像时才真正打开。
     ros::Subscriber compressed_image_sub;
+    ros::Subscriber raw_image_sub;
 
     // 解码后的小图发布者，作为后续 RKNN 推理节点的输入。
     ros::Publisher raw_image_pub;
@@ -51,9 +53,14 @@ public:
     // 对输入压缩流做分频，跳帧降低后续处理负担。
     int fps_div;
 
-    // scale:
-    // 解码后的缩放比例。例如 0.5 表示 1280x720 -> 640x360。
-    double scale;
+	// scale:
+	// 解码后的缩放比例。例如 0.5 表示 1280x720 -> 640x360。
+	double scale;
+
+    // 上游输入格式配置，支持 mjpeg / yuyv。
+    int width = 1280;
+    int height = 720;
+    string input_format = "mjpeg";
 
     // frame_cnt:
     // 已收到的压缩帧数量，用于分频逻辑。
@@ -68,9 +75,11 @@ public:
      *            - data:         压缩后的 JPEG 字节流。
      */
     void compressed_image_callback(const sensor_msgs::CompressedImageConstPtr& msg);
+    void raw_image_callback(const sensor_msgs::ImageConstPtr& msg);
 
     // 上游压缩图像话题名称，通常是 /image_raw/compressed。
     string sub_jpeg_image_topic;
+    string sub_raw_image_topic;
 
     /**
      * 根据下游订阅者数量决定是否打开上游订阅。

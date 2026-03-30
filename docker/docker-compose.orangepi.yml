@@ -1,0 +1,49 @@
+services:
+  robot:
+    container_name: ${ROBOT_CONTAINER_NAME:-robot}
+    image: ${ROBOT_IMAGE_TAG:-robot:board}
+    build:
+      context: ./build
+      dockerfile: robot_board.dockerfile
+      args:
+        BASE_IMAGE: ${ROBOT_BASE_IMAGE:-ubuntu:20.04}
+    privileged: true
+    network_mode: host
+    pid: host
+    ipc: host
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    working_dir: /home/orangepi/robot
+    environment:
+      DISPLAY: ${DISPLAY:-:0}
+      XDG_RUNTIME_DIR: ${XDG_RUNTIME_DIR:-/run/user/1000}
+      PULSE_SERVER: unix:${XDG_RUNTIME_DIR:-/run/user/1000}/pulse/native
+      ROBOT_WORKSPACE: /home/orangepi/robot
+      ROBOT_NODE_LOG_DIR: /home/orangepi/robot/logs/nodes
+      ROBOT_NODE_LOG_MAX_BYTES: ${ROBOT_NODE_LOG_MAX_BYTES:-20971520}
+      ROBOT_LOG_RETENTION_SECONDS: ${ROBOT_LOG_RETENTION_SECONDS:-3600}
+      ROBOT_AUTO_CATKIN_MAKE: ${ROBOT_AUTO_CATKIN_MAKE:-1}
+      ROBOT_FORCE_CATKIN_MAKE: ${ROBOT_FORCE_CATKIN_MAKE:-0}
+      ROBOT_AUTO_BUILD_RK_USERLIBS: ${ROBOT_AUTO_BUILD_RK_USERLIBS:-1}
+      ROBOT_FORCE_BUILD_RK_USERLIBS: ${ROBOT_FORCE_BUILD_RK_USERLIBS:-0}
+      ROBOT_RK_SOFT_DIR: /opt/rk-soft
+      ROBOT_START_ROSCORE: ${ROBOT_START_ROSCORE:-1}
+      ROBOT_START_ROSOUT_SPLITTER: ${ROBOT_START_ROSOUT_SPLITTER:-1}
+      ROBOT_START_WEB: ${ROBOT_START_WEB:-1}
+      ROBOT_START_AGENT: ${ROBOT_START_AGENT:-1}
+      ROBOT_AGENT_REQUIRED: ${ROBOT_AGENT_REQUIRED:-0}
+      ROBOT_START_BASE_CONTROL: ${ROBOT_START_BASE_CONTROL:-1}
+      ROBOT_START_ALL_LAUNCH: ${ROBOT_START_ALL_LAUNCH:-1}
+      ROBOT_AP_MODE: ${ROBOT_AP_MODE:-0}
+      ROS_IP: ${ROS_IP:-}
+      ROS_HOSTNAME: ${ROS_HOSTNAME:-}
+      ROS_MASTER_URI: ${ROS_MASTER_URI:-}
+    volumes:
+      - ..:/home/orangepi/robot
+      - /home/orangepi/soft:/opt/rk-soft:ro
+      - /run/dbus:/run/dbus
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/machine-id:/etc/machine-id:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ${XDG_RUNTIME_DIR:-/run/user/1000}:${XDG_RUNTIME_DIR:-/run/user/1000}

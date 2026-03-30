@@ -12,13 +12,7 @@
 #include <stdlib.h>
 
 #include <ros/ros.h>
-
-
-// 低时延链路在采集端直接选择 MJPEG：
-// 1. USB 侧传输的是压缩帧，带宽压力远小于原始 YUYV/RGB。
-// 2. ROS 第一跳继续传输压缩帧，避免在入口处就搬运大图。
-// 如果改成 YUYV，需要在后续节点里承担更高的拷贝和传输成本。
-#define VIDEO_FORMAT V4L2_PIX_FMT_MJPEG //V4L2_PIX_FMT_YUYV
+#include <string>
 
 // V4L2 驱动申请 4 个 mmap 环形缓冲区：
 // 数量太少会更容易在消费端抖动时卡住采集；
@@ -41,6 +35,19 @@ struct FrameBuf
   int length;
 };
 
+enum class CaptureFormat
+{
+  kMjpeg = 0,
+  kYuyv,
+};
+
+bool parse_capture_format(const std::string &format_name, CaptureFormat *format);
+bool v4l2_pixfmt_to_capture_format(__u32 pixfmt, CaptureFormat *format);
+const char *capture_format_to_string(CaptureFormat format);
+const char *capture_format_to_message_format(CaptureFormat format);
+const char *capture_format_to_image_encoding(CaptureFormat format);
+__u32 capture_format_to_v4l2_pixfmt(CaptureFormat format);
+
 /**
  * 对 V4L2 采集过程做一个很薄的封装。
  *
@@ -56,6 +63,8 @@ class V4l2
 {
 
 public:
+    V4l2();
+
     // buf:
     // V4L2 当前正在 dequeue / queue 的缓冲区描述符。
     struct v4l2_buffer buf;
@@ -68,15 +77,21 @@ public:
     // 摄像头设备文件描述符，例如 /dev/video0 打开后得到的句柄。
     int fd;
 
+    // 驱动最终协商成功的采集格式。
+    CaptureFormat active_format;
+
     /**
      * 初始化摄像头采集。
      *
      * @param dev_name 设备节点路径，例如 "/dev/video0"。
      * @param width    期望采集宽度。驱动可能会协商成最接近的可用值。
      * @param height   期望采集高度。驱动可能会协商成最接近的可用值。
+     * @param format   期望采集格式，支持 MJPEG / YUYV。
+     * @param fps      期望采集帧率。
      * @return         0 表示初始化成功；小于 0 表示打开设备或配置流失败。
      */
-    int init_video(const char *dev_name,int width,int height);
+    int init_video(const char *dev_name, int width, int height, CaptureFormat format,
+                   int fps);
 
     /**
      * 获取一帧最新图像数据。

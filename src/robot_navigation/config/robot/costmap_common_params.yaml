@@ -8,7 +8,7 @@ inflation_radius: 0.2 #1.0 #膨胀半径 如果机器人经常撞到障碍物就
 cost_scaling_factor: 3.0 #3.0 # exponential rate at which the obstacle cost drops off(default: 10)
 
 map_type: costmap
-observation_sources: scan
+observation_sources: scan  # 观测来源
 scan: {sensor_frame: laser_link, data_type: LaserScan, topic: scan, marking: true, clearing: true}
 #marking表示是否可以使用该传感器来标记障碍物
 #clearing表示是否可以使用该传感器来清除障碍物标记为自由空间

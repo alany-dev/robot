@@ -8,7 +8,6 @@
 
 ImgEncode::ImgEncode() : nh("~")
 {
-    
     int width,height,jpeg_quality;
 
     // sub_image_topic:
@@ -27,6 +26,10 @@ ImgEncode::ImgEncode() : nh("~")
 
     // 输出话题统一挂在输入 raw 图像后面，形成 xxx/compressed。
     jpeg_pub = nh.advertise<sensor_msgs::CompressedImage>(sub_image_topic+"/compressed", 10);
+
+    ROS_INFO("img_encode init: sub_raw=%s pub_jpeg=%s quality=%d size=%dx%d",
+             sub_image_topic.c_str(), (sub_image_topic + "/compressed").c_str(),
+             jpeg_quality, width, height);
 
 #if(USE_ARM_LIB==1)
     // ARM 板端走 RGA + MPP 硬编码。
@@ -132,4 +135,3 @@ int main(int argc, char** argv)
 
     return 0;
 }
-

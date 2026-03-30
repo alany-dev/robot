@@ -150,8 +150,9 @@ int RknnRun::run_infer_thread()
     ret = rknn_load(ctx,model_file.c_str(),model_data,io_num,print_perf_detail,use_multi_npu_core);
     if(ret<0)
     {
-      ROS_WARN("rknn_load error, shutdown\n");
+      ROS_WARN("rknn_load failed: model=%s ret=%d, shutdown", model_file.c_str(), ret);
       ros::shutdown();
+      return ret;
     }
 
     rknn_input inputs[io_num.n_input];
@@ -166,8 +167,9 @@ int RknnRun::run_infer_thread()
     ret = rknn_config(ctx,io_num,model_width,model_height,inputs,infer_data.outputs,out_scales,out_zps,output_want_float);
     if(ret<0)
     {
-      ROS_WARN("rknn_config error, shutdown\n");
+      ROS_WARN("rknn_config failed: model=%s ret=%d, shutdown", model_file.c_str(), ret);
       ros::shutdown();
+      return ret;
     }
 #endif
 

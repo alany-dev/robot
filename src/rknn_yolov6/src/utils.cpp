@@ -1,5 +1,7 @@
 #include "utils.h"
 
+#include <ros/ros.h>
+
 #if(USE_ARM_LIB==1)
 
 int rknn_load(rknn_context &ctx,const char* model_name, unsigned char* model_data, rknn_input_output_num &io_num,
@@ -7,23 +9,27 @@ int rknn_load(rknn_context &ctx,const char* model_name, unsigned char* model_dat
 {
     int ret;
     /* Create the neural network */
-    printf("Loading mode...\n");
+    ROS_INFO("Loading RKNN model: %s", model_name);
     int            model_data_size = 0;
     model_data      = load_model(model_name, &model_data_size);
+    if (model_data == NULL || model_data_size <= 0) {
+      ROS_ERROR("load_model failed: model=%s size=%d", model_name, model_data_size);
+      return -1;
+    }
     if(print_perf_detail)
     {
         ret = rknn_init(&ctx, model_data, model_data_size, RKNN_FLAG_COLLECT_PERF_MASK, NULL);//测试性能 注意：打开测试会让推理变慢！！！！
-        printf("print_perf_detail is true\n");
+        ROS_INFO("print_perf_detail is true");
     }
     else
     {
         ret = rknn_init(&ctx, model_data, model_data_size, 0, NULL);//不测试性能
-        printf("print_perf_detail is false\n");
+        ROS_INFO("print_perf_detail is false");
     }
 
     if (ret < 0) {
-      printf("rknn_init error ret=%d\n", ret);
-      return -1;
+      ROS_ERROR("rknn_init failed: model=%s ret=%d", model_name, ret);
+      return ret;
     }
 
 
@@ -33,18 +39,18 @@ int rknn_load(rknn_context &ctx,const char* model_name, unsigned char* model_dat
     if(use_multi_npu_core)
     {
         core_mask = RKNN_NPU_CORE_0_1_2;
-        printf("rknn_set_core_mask: RKNN_NPU_CORE_0_1_2\n");
+        ROS_INFO("rknn_set_core_mask: RKNN_NPU_CORE_0_1_2");
     }
     else
     {
         core_mask = RKNN_NPU_CORE_AUTO;
-        printf("rknn_set_core_mask: RKNN_NPU_CORE_AUTO\n");
+        ROS_INFO("rknn_set_core_mask: RKNN_NPU_CORE_AUTO");
     }
 
     ret = rknn_set_core_mask(ctx, core_mask);
     if (ret < 0) {
-      printf("rknn_set_core_mask error ret=%d\n", ret);
-      return -1;
+      ROS_ERROR("rknn_set_core_mask failed: model=%s ret=%d", model_name, ret);
+      return ret;
     }
 
 
@@ -52,18 +58,18 @@ int rknn_load(rknn_context &ctx,const char* model_name, unsigned char* model_dat
     rknn_sdk_version version;
     ret = rknn_query(ctx, RKNN_QUERY_SDK_VERSION, &version, sizeof(rknn_sdk_version));
     if (ret < 0) {
-      printf("rknn_init error ret=%d\n", ret);
-      return -1;
+      ROS_ERROR("rknn_query(RKNN_QUERY_SDK_VERSION) failed: model=%s ret=%d", model_name, ret);
+      return ret;
     }
-    printf("sdk version: %s driver version: %s\n", version.api_version, version.drv_version);
+    ROS_INFO("sdk version: %s driver version: %s", version.api_version, version.drv_version);
     //sdk version: 1.4.0 (a10f100eb@2022-09-09T09:07:14) driver version: 0.8.2 --2023.2.3
 
     ret = rknn_query(ctx, RKNN_QUERY_IN_OUT_NUM, &io_num, sizeof(io_num));
     if (ret < 0) {
-      printf("rknn_init error ret=%d\n", ret);
-      return -1;
+      ROS_ERROR("rknn_query(RKNN_QUERY_IN_OUT_NUM) failed: model=%s ret=%d", model_name, ret);
+      return ret;
     }
-    printf("model input num: %d, output num: %d\n", io_num.n_input, io_num.n_output);
+    ROS_INFO("model input num: %d, output num: %d", io_num.n_input, io_num.n_output);
 
     return 0;
 }
@@ -80,8 +86,8 @@ int rknn_config(rknn_context &ctx,rknn_input_output_num &io_num,int &width,int &
       input_attrs[i].index = i;
       ret = rknn_query(ctx, RKNN_QUERY_INPUT_ATTR, &(input_attrs[i]), sizeof(rknn_tensor_attr));
       if (ret < 0) {
-        printf("rknn_init error ret=%d\n", ret);
-        return -1;
+        ROS_ERROR("rknn_query(RKNN_QUERY_INPUT_ATTR) failed: index=%d ret=%d", i, ret);
+        return ret;
       }
       dump_tensor_attr(&(input_attrs[i]));
     }
@@ -97,18 +103,18 @@ int rknn_config(rknn_context &ctx,rknn_input_output_num &io_num,int &width,int &
 
     int channel = 3;
     if (input_attrs[0].fmt == RKNN_TENSOR_NCHW) {
-      printf("model is NCHW input fmt\n");
+      ROS_INFO("model is NCHW input fmt");
       channel = input_attrs[0].dims[1];
       height  = input_attrs[0].dims[2];
       width   = input_attrs[0].dims[3];
     } else {
-      printf("model is NHWC input fmt\n");
+      ROS_INFO("model is NHWC input fmt");
       height  = input_attrs[0].dims[1];
       width   = input_attrs[0].dims[2];
       channel = input_attrs[0].dims[3];
     }
 
-    printf("model input height=%d, width=%d, channel=%d\n", height, width, channel);
+    ROS_INFO("model input height=%d, width=%d, channel=%d", height, width, channel);
 
     memset(inputs, 0, sizeof(rknn_input)*io_num.n_input);
     for (int i = 0; i < io_num.n_input; i++)
@@ -130,7 +136,7 @@ int rknn_config(rknn_context &ctx,rknn_input_output_num &io_num,int &width,int &
       else
          outputs[i].want_float = 0;
 
-      printf("outputs%d want_float = %d\n",i,outputs[i].want_float);
+      ROS_INFO("outputs%d want_float = %d", i, outputs[i].want_float);
     }
 
     for (int i = 0; i < io_num.n_output; ++i)
@@ -168,7 +174,7 @@ int rga_resize(cv::Mat &img,cv::Mat &img_resize,cv::Size &size)
     int ret = imcheck(src, dst, src_rect, dst_rect);
     if (IM_STATUS_NOERROR != ret)
     {
-        printf("%d, check error! %s", __LINE__, imStrError((IM_STATUS)ret));
+        ROS_ERROR("%d, check error! %s", __LINE__, imStrError((IM_STATUS)ret));
         return -1;
     }
     IM_STATUS STATUS = imresize(src, dst);
@@ -186,11 +192,10 @@ int rga_resize(cv::Mat &img,cv::Mat &img_resize,cv::Size &size)
 
 void dump_tensor_attr(rknn_tensor_attr* attr)
 {
-  printf("  index=%d, name=%s, n_dims=%d, dims=[%d, %d, %d, %d], n_elems=%d, size=%d, fmt=%s, type=%s, qnt_type=%s, "
-         "zp=%d, scale=%f\n",
-         attr->index, attr->name, attr->n_dims, attr->dims[0], attr->dims[1], attr->dims[2], attr->dims[3],
-         attr->n_elems, attr->size, get_format_string(attr->fmt), get_type_string(attr->type),
-         get_qnt_type_string(attr->qnt_type), attr->zp, attr->scale);
+  ROS_INFO("index=%d, name=%s, n_dims=%d, dims=[%d, %d, %d, %d], n_elems=%d, size=%d, fmt=%s, type=%s, qnt_type=%s, zp=%d, scale=%f",
+           attr->index, attr->name, attr->n_dims, attr->dims[0], attr->dims[1], attr->dims[2], attr->dims[3],
+           attr->n_elems, attr->size, get_format_string(attr->fmt), get_type_string(attr->type),
+           get_qnt_type_string(attr->qnt_type), attr->zp, attr->scale);
 }
 
 #endif
@@ -210,13 +215,13 @@ unsigned char* load_data(FILE* fp, size_t ofst, size_t sz)
 
   ret = fseek(fp, ofst, SEEK_SET);
   if (ret != 0) {
-    printf("blob seek failure.\n");
+    ROS_ERROR("blob seek failure");
     return NULL;
   }
 
   data = (unsigned char*)malloc(sz);
   if (data == NULL) {
-    printf("buffer malloc failure.\n");
+    ROS_ERROR("buffer malloc failure");
     return NULL;
   }
   ret = fread(data, 1, sz, fp);
@@ -230,7 +235,7 @@ unsigned char* load_model(const char* filename, int* model_size)
 
   fp = fopen(filename, "rb");
   if (NULL == fp) {
-    printf("Open file %s failed.\n", filename);
+    ROS_ERROR("Open file %s failed", filename);
     return NULL;
   }
 
@@ -332,4 +337,3 @@ int get_file_id(std::string &path)
 
     return atoi(name.c_str());
 }
-

@@ -1,11 +1,14 @@
 #include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/CompressedImage.h>
+#include <sensor_msgs/Image.h>
 #include <opencv2/opencv.hpp>
 #include <camera_info_manager/camera_info_manager.h>
 #include <shm_transport/shm_topic.hpp>
 
 #include <iostream>
+#include <string>
 #include <sys/time.h>
 #include <math.h>
 
@@ -33,8 +36,9 @@ public:
 
     ros::NodeHandle nh;
 
-    // 上游仍然是普通 ROS 压缩图像订阅。
+    // 上游仍然是普通 ROS 输入订阅。
     ros::Subscriber compressed_image_sub;
+    ros::Subscriber raw_image_sub;
 
     // 下游改成共享内存发布 raw 图像。
     shm_transport::Publisher shm_raw_image_pub;  // 共享内存发布者
@@ -43,6 +47,9 @@ public:
 
     int fps_div;
     double scale;
+    int width = 1280;
+    int height = 720;
+    string input_format = "mjpeg";
     unsigned int frame_cnt=0;
 
     /**
@@ -51,8 +58,10 @@ public:
      * @param msg 压缩图像消息。
      */
     void compressed_image_callback(const sensor_msgs::CompressedImageConstPtr& msg);
+    void raw_image_callback(const sensor_msgs::ImageConstPtr& msg);
 
     string sub_jpeg_image_topic;
+    string sub_raw_image_topic;
 
     /**
      * 根据共享内存下游订阅者数量决定是否继续订阅上游压缩流。

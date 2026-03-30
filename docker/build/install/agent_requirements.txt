@@ -1,0 +1,17 @@
+requests>=2.25.0
+beautifulsoup4>=4.9.0
+dashscope>=1.10.0
+openai>=1.0.0
+pyaudio>=0.2.11
+pulsectl
+pyttsx3
+pyzbar
+gpio
+python-periphery
+sounddevice
+httpx
+pycryptodome
+pytz
+flask
+websocket-client==1.8.0
+websockets

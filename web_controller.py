@@ -12,6 +12,7 @@ import os
 import signal
 import sys
 import atexit
+from pathlib import Path
 from flask import Flask, render_template, request, jsonify
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String, Bool
@@ -20,6 +21,24 @@ import time
 
 
 app = Flask(__name__)
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+NODE_LOG_DIR = Path(
+    os.environ.get('ROBOT_NODE_LOG_DIR', str(PROJECT_ROOT / 'logs' / 'nodes'))
+)
+
+
+def ensure_log_dirs():
+    """确保节点日志目录存在。"""
+    NODE_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def build_runtime_env():
+    """为后台进程补齐统一的节点日志环境变量。"""
+    ensure_log_dirs()
+    env = os.environ.copy()
+    env['ROBOT_NODE_LOG_DIR'] = str(NODE_LOG_DIR)
+    return env
 
 class RobotController:
     def __init__(self, ap_mode=False):
@@ -251,11 +270,9 @@ class RobotController:
             
             if os.path.exists(agent_script):
                 print("🚀 启动新的Agent进程...")
-                # 使用nice -n 0 bash在后台运行，并重定向输出
                 process = subprocess.Popen(
                     ['nice', '-n', '0', 'bash', agent_script],
-                    stdout=open('/tmp/agent_output.log', 'w'),
-                    stderr=open('/tmp/agent_error.log', 'w'),
+                    env=build_runtime_env(),
                     preexec_fn=os.setsid  # 创建新的进程组
                 )
                 
@@ -300,12 +317,10 @@ class RobotController:
             
             print(f"执行启动命令: {launch_cmd}")
             
-            # 在后台运行ROS launch
             process = subprocess.Popen(
                 launch_cmd,
                 shell=True,
-                stdout=open('/tmp/ros_launch.log', 'w'),
-                stderr=open('/tmp/ros_launch_error.log', 'w'),
+                env=build_runtime_env(),
                 preexec_fn=os.setsid  # 创建新的进程组
             )
             
@@ -420,12 +435,10 @@ class RobotController:
             
             print(f"执行启动命令: {launch_cmd}")
             
-            # 在后台运行导航launch
             process = subprocess.Popen(
                 launch_cmd,
                 shell=True,
-                stdout=open('/tmp/navigation_launch.log', 'w'),
-                stderr=open('/tmp/navigation_launch_error.log', 'w'),
+                env=build_runtime_env(),
                 preexec_fn=os.setsid  # 创建新的进程组
             )
             
@@ -836,9 +849,11 @@ def configure_wifi():
         print(f"执行WiFi配置命令: {cmd}")
         
         # 在后台执行命令，避免阻塞
-        subprocess.Popen(cmd, shell=True, 
-                        stdout=open('/tmp/wifi_config.log', 'w'),
-                        stderr=open('/tmp/wifi_config_error.log', 'w'))
+        subprocess.Popen(
+            cmd,
+            shell=True,
+            env=build_runtime_env(),
+        )
         
         print(f"WiFi配置命令已启动: {ssid}")
         return jsonify({'success': True, 'message': 'WiFi配置已启动，系统将重启并连接到新网络'})
